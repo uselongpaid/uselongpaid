@@ -244,8 +244,9 @@ Deploy it as **one long-running Node process with a persistent disk** for `DATAB
 with a volume. Serverless platforms with ephemeral filesystems will lose the database. Back up the SQLite file regularly,
 for example with `sqlite3 longpaid.db ".backup backup.db"` from cron.
 
-**Railway:** the repo includes `railway.json` (build `npm ci && npm run build`, start `npm start`, health check on
-`/api/version`) and `.nvmrc` (Node 22). Add a **Volume** mounted at `/data` and set `DATABASE_PATH=/data/longpaid.db`,
+**Railway:** Railway's default Node build works as is (`npm ci`, `npm run build`, `npm start`). `railway.json` only adds
+a health check on `/api/version`, and `.nvmrc` pins Node 22. Don't set a custom build command that runs `npm ci` again:
+it collides with Railway's build cache (`EBUSY … node_modules/.cache`). Add a **Volume** mounted at `/data` and set `DATABASE_PATH=/data/longpaid.db`,
 or the database is wiped on every deploy. After a deploy, open `/api/version`: `commit` must match the latest commit on
 `main`.
 
