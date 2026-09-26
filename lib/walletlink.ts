@@ -22,7 +22,7 @@ export function linkMessage(f: LinkFields): string {
 
 /** Short code the owner posts from their X account; derived from the signature so it can't be reused elsewhere. */
 export function verificationCode(signature: string): string {
-  return "FR-" + keccak256(signature as `0x${string}`).slice(2, 10).toUpperCase();
+  return "LP-" + keccak256(signature as `0x${string}`).slice(2, 10).toUpperCase();
 }
 
 export function tweetText(code: string, appName: string): string {

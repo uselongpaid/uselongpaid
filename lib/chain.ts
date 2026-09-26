@@ -9,4 +9,4 @@ export const chain = {
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
 };
 
-export const appName = process.env.NEXT_PUBLIC_APP_NAME || "Feeroute";
+export const appName = process.env.NEXT_PUBLIC_APP_NAME || "LongPaid";

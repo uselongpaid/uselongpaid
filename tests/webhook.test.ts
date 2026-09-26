@@ -19,8 +19,8 @@ test("signs the request body with the shared secret", async () => {
 
   const headers = seen.req!.headers as Record<string, string>;
   const body = seen.req!.body as string;
-  const expected = createHmac("sha256", "s3cret").update(`${headers["x-feeroute-timestamp"]}.${body}`).digest("hex");
-  assert.equal(headers["x-feeroute-signature"], `sha256=${expected}`);
+  const expected = createHmac("sha256", "s3cret").update(`${headers["x-longpaid-timestamp"]}.${body}`).digest("hex");
+  assert.equal(headers["x-longpaid-signature"], `sha256=${expected}`);
   const json = JSON.parse(body);
   assert.equal(json.idempotencyKey, "payout-7");
   assert.equal(json.amountUsd, "12.34");

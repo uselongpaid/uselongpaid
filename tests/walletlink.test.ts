@@ -14,7 +14,7 @@ import type { PayoutProvider } from "../lib/payouts/types.ts";
 const account = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
 
 test("the signed message proves the wallet, and the code is tied to the signature", async () => {
-  const message = linkMessage({ appName: "Feeroute", handle: "alice", wallet: account.address, chainId: 4663, issuedAt: "2026-09-27T00:00:00.000Z" });
+  const message = linkMessage({ appName: "LongPaid", handle: "alice", wallet: account.address, chainId: 4663, issuedAt: "2026-09-27T00:00:00.000Z" });
   assert.match(message, /X account: @alice/);
   assert.match(message, /Chain ID: 4663/);
   const signature = await account.signMessage({ message });
@@ -25,7 +25,7 @@ test("the signed message proves the wallet, and the code is tied to the signatur
   assert.equal(await verifyMessage({ address: account.address, message: other, signature }), false);
 
   const code = verificationCode(signature);
-  assert.match(code, /^FR-[0-9A-F]{8}$/);
+  assert.match(code, /^LP-[0-9A-F]{8}$/);
   assert.equal(verificationCode(signature), code);
 });
 
@@ -43,7 +43,7 @@ test("approving a request sets the wallet, closes rivals, and releases waiting p
   upsertToken(db, { address: "0x" + "a".repeat(40), chainId: 4663, name: "Moon", symbol: "MOON", handle: "alice", launchedAt: 0 });
   recordClaim(db, opts, "0x" + "a".repeat(40), 10_000_000, "0x" + "1".repeat(64));
 
-  const base = { handle: "alice", message: "m", signature: "0x01", code: "FR-00000000", tweetUrl: "https://x.com/alice/status/123456" };
+  const base = { handle: "alice", message: "m", signature: "0x01", code: "LP-00000000", tweetUrl: "https://x.com/alice/status/123456" };
   const good = createLinkRequest(db, { ...base, wallet: account.address });
   const rival = createLinkRequest(db, { ...base, wallet: "0x" + "9".repeat(40) });
   assert.equal(listLinkRequests(db, { status: "pending" }).length, 2);
@@ -69,10 +69,10 @@ test("approving a request sets the wallet, closes rivals, and releases waiting p
 
 test("a repeat request from the same handle and wallet replaces the pending one", () => {
   const db = openDb(":memory:");
-  const r = { handle: "alice", wallet: account.address, message: "m", signature: "0x01", code: "FR-1", tweetUrl: "https://x.com/alice/status/123456" };
+  const r = { handle: "alice", wallet: account.address, message: "m", signature: "0x01", code: "LP-1", tweetUrl: "https://x.com/alice/status/123456" };
   createLinkRequest(db, r);
-  createLinkRequest(db, { ...r, code: "FR-2" });
+  createLinkRequest(db, { ...r, code: "LP-2" });
   const pending = listLinkRequests(db, { status: "pending" });
   assert.equal(pending.length, 1);
-  assert.equal(pending[0].code, "FR-2");
+  assert.equal(pending[0].code, "LP-2");
 });

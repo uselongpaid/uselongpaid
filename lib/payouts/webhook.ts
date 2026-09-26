@@ -5,8 +5,8 @@ import type { PayoutProvider, PayoutRequest, PayoutResult } from "./types.ts";
  * Sends each payout to an operator-run service that pays the X account (for example through X Money).
  *
  * Request: POST JSON {id, idempotencyKey, handle, wallet, amountMicros, amountUsd, currency}
- *   headers  x-feeroute-timestamp: <unix ms>
- *            x-feeroute-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>" with the shared secret>
+ *   headers  x-longpaid-timestamp: <unix ms>
+ *            x-longpaid-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>" with the shared secret>
  * Response: 200 {"status": "sent", "ref": "..."}    -> payout marked paid
  *           200 {"status": "failed", "reason": "..."} or any 4xx -> marked failed, money returns to the balance
  *           5xx or network error -> left queued and retried next cycle
@@ -44,7 +44,7 @@ export class WebhookPayoutProvider implements PayoutProvider {
 
     const res = await this.fetchImpl(this.url, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-feeroute-timestamp": ts, "x-feeroute-signature": `sha256=${sig}` },
+      headers: { "content-type": "application/json", "x-longpaid-timestamp": ts, "x-longpaid-signature": `sha256=${sig}` },
       body,
       signal: AbortSignal.timeout(30_000),
     });

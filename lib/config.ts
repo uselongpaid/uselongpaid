@@ -10,9 +10,9 @@ function num(name: string, fallback: number): number {
 }
 
 export const config = {
-  appName: process.env.NEXT_PUBLIC_APP_NAME || "Feeroute",
+  appName: process.env.NEXT_PUBLIC_APP_NAME || "LongPaid",
   chain,
-  databasePath: process.env.DATABASE_PATH || "./data/feeroute.db",
+  databasePath: process.env.DATABASE_PATH || "./data/longpaid.db",
   cronSecret: process.env.CRON_SECRET || "",
   recipientShareBps: num("RECIPIENT_SHARE_BPS", 8000),
   milestones: parseMilestones(process.env.PAYOUT_MILESTONES_USD, process.env.PAYOUT_MILESTONE_STEP_USD),

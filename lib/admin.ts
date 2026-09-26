@@ -5,7 +5,7 @@ import { config } from "./config.ts";
 import { sign, verify } from "./session.ts";
 import { authorized } from "./server.ts";
 
-export const ADMIN_COOKIE = "fr_admin";
+export const ADMIN_COOKIE = "lp_admin";
 export const ADMIN_TTL_MS = 12 * 3_600_000;
 
 export function adminEnabled(): boolean {

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/logo.svg" width="72" height="72" alt="Feeroute logo" />
+  <img src="public/logo.svg" width="72" height="72" alt="LongPaid logo" />
 </p>
 
-<h1 align="center">Feeroute</h1>
+<h1 align="center">LongPaid</h1>
 
 <p align="center">
   Route the creator fees of <a href="https://long.xyz">long.xyz</a> tokens to any X account — split on-chain, paid out automatically.
@@ -18,7 +18,7 @@
 
 ---
 
-A token launched on long.xyz names the Feeroute treasury as its **creator-fee beneficiary** and puts an **X handle** in its
+A token launched on long.xyz names the LongPaid treasury as its **creator-fee beneficiary** and puts an **X handle** in its
 metadata. The team claims those fees on-chain and records each claim with its transaction hash. From that moment on,
 everything is automatic:
 
@@ -28,7 +28,7 @@ everything is automatic:
 - Payouts go on-chain on **Robinhood Chain** as a USD stablecoin to the wallet the account owner connected and verified.
   Until they link one, the money waits for them — nothing is lost.
 
-> Feeroute is an independent project. It is not affiliated with long.xyz, X, or UsePaid.
+> LongPaid is an independent project. It is not affiliated with long.xyz, X, or UsePaid.
 
 ## Contents
 
@@ -56,7 +56,7 @@ sequenceDiagram
     participant C as Token creator
     participant L as long.xyz
     participant D as Dev (admin)
-    participant F as Feeroute
+    participant F as LongPaid
     participant X as Account owner
     participant B as Chain
 
@@ -177,7 +177,7 @@ which marks all pending burns done. The total owed is always shown on the dashbo
 ## Payout safety
 
 Sending money on-chain can fail in an ambiguous way: the transaction was broadcast, but the process crashed or the RPC timed
-out before the receipt came back. Feeroute never guesses in that case.
+out before the receipt came back. LongPaid never guesses in that case.
 
 1. Before handing a payout to the provider, the engine sets `attempted_at` with a conditional update, so two runs can't take
    the same payout.
@@ -196,7 +196,7 @@ X login. The flow uses a wallet signature plus a public post:
 
 1. **Connect wallet** on `/wallet`. The site asks the wallet to add or switch to Robinhood Chain.
 2. **Sign** a message naming the handle, the wallet, the chain ID and a timestamp. This is free and sends no transaction.
-3. **Post** the code shown (`FR-XXXXXXXX`, derived from the signature) from that X account, then paste the post's link.
+3. **Post** the code shown (`LP-XXXXXXXX`, derived from the signature) from that X account, then paste the post's link.
 4. The server **verifies the signature** (`POST /api/wallet/link`) and stores a pending request.
 5. An admin opens the post, confirms the **author** is that handle and the code matches, then approves in `/admin`.
    Approving sets the wallet, rejects competing requests for the handle, and immediately sends anything that was waiting.
@@ -242,7 +242,7 @@ npm start
 
 Deploy it as **one long-running Node process with a persistent disk** for `DATABASE_PATH`: a VPS, Fly.io, Railway or Render
 with a volume. Serverless platforms with ephemeral filesystems will lose the database. Back up the SQLite file regularly,
-for example with `sqlite3 feeroute.db ".backup backup.db"` from cron.
+for example with `sqlite3 longpaid.db ".backup backup.db"` from cron.
 
 Schedule distribution so late wallet links and payouts that waited on a top-up go out on their own:
 
@@ -291,7 +291,7 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `CRON_SECRET` | yes | Bearer token for `/api/cron/*` and the JSON admin API. |
 | `APP_URL` | yes | Public URL. Used for same-origin checks. |
 | `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_CHAIN_NAME`, `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_EXPLORER_URL` | | Chain for Connect wallet and the default for every RPC. Defaults to Robinhood Chain mainnet (`4663`). Set at build time. |
-| `DATABASE_PATH` | | SQLite file. Default `./data/feeroute.db`. |
+| `DATABASE_PATH` | | SQLite file. Default `./data/longpaid.db`. |
 | `LONG_RPC_URL`, `LONG_CHAIN_ID` | | RPC for claim-tx verification, wallet signatures and token info. Defaults to the chain above; use a dedicated provider in production. |
 | `TREASURY_ADDRESS` | yes | Fee beneficiary shown in the launch guide. |
 | `RECIPIENT_SHARE_BPS` | | Account share in basis points. Default `8000` (80%). |
@@ -328,8 +328,8 @@ Webhook payout contract (`PAYOUT_PROVIDER=webhook`), in [`lib/payouts/webhook.ts
 
 ```http
 POST $PAYOUT_WEBHOOK_URL
-x-feeroute-timestamp: 1790000000000
-x-feeroute-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>">
+x-longpaid-timestamp: 1790000000000
+x-longpaid-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>">
 
 {"id": 12, "idempotencyKey": "payout-12", "handle": "alice", "wallet": "0x…",
  "amountMicros": 8000000, "amountUsd": "8.00", "currency": "USD"}
