@@ -29,3 +29,11 @@ export function tokenAmountToMicros(amount: bigint, decimals: number, usdPrice: 
   const priceMicros = BigInt(usdToMicros(usdPrice));
   return Number((amount * priceMicros) / scale);
 }
+
+/** Parses a dollar amount typed by a person ("12", "12.5", "0.000001") into micro-dollars. */
+export function parseUsd(input: string): number | null {
+  const s = input.trim().replace(/^\$/, "").replace(/,/g, "");
+  const m = s.match(/^(\d{1,12})(?:\.(\d{1,6}))?$/);
+  if (!m) return null;
+  return Number(m[1]) * MICROS + Number((m[2] ?? "").padEnd(6, "0"));
+}

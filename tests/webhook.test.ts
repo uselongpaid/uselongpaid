@@ -10,7 +10,7 @@ function fakeFetch(status: number, body: unknown, seen: { req?: RequestInit } = 
   }) as unknown as typeof fetch;
 }
 
-const payout = { id: 7, handle: "alice", amountMicros: 12_340_000 };
+const payout = { id: 7, handle: "alice", amountMicros: 12_340_000, wallet: null };
 
 test("signs the request body with the shared secret", async () => {
   const seen: { req?: RequestInit } = {};

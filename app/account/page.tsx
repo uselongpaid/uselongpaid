@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { currentSession, xLoginEnabled } from "@/lib/auth.ts";
 import { formatUsd } from "@/lib/money.ts";
-import { getAccount, listTokens } from "@/lib/queries.ts";
+import { getAccount, listPayouts, listTokens } from "@/lib/queries.ts";
+import { config } from "@/lib/config.ts";
 import { db } from "@/lib/server.ts";
 import { Avatar } from "@/components/Avatar.tsx";
 
@@ -12,6 +13,7 @@ const ERRORS: Record<string, string> = {
   state: "The sign-in link expired or was already used. Try again.",
   token: "X didn't accept the sign-in. Try again.",
   profile: "We couldn't read your X username. Try again.",
+  wallet: "That isn't a valid wallet address.",
 };
 
 export default async function Account({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string }> }) {
@@ -44,6 +46,8 @@ export default async function Account({ searchParams }: { searchParams: Promise<
   const account = getAccount(d, session.handle);
   const tokens = listTokens(d, { handle: session.handle, limit: 200 });
   const optedOut = Boolean(account?.opted_out);
+  const queued = listPayouts(d, { handle: session.handle, status: "queued" });
+  const waitingMicros = queued.reduce((s, p) => s + p.amount_micros, 0);
 
   return (
     <div className="docs">
@@ -56,7 +60,10 @@ export default async function Account({ searchParams }: { searchParams: Promise<
           </Link>
         </div>
       </div>
-      {saved && <p className="notice ok">Saved.</p>}
+      {saved && (
+        <p className="notice ok">{saved.startsWith("sent-") ? `Saved. ${saved.slice(5)} waiting payout(s) sent to your wallet.` : "Saved."}</p>
+      )}
+      {error === "wallet" && <p className="notice error">{ERRORS.wallet}</p>}
 
       <div className="stats" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="stat">
@@ -72,6 +79,28 @@ export default async function Account({ searchParams }: { searchParams: Promise<
           <div className="value">{tokens.length}</div>
         </div>
       </div>
+
+      {config.payoutProvider === "erc20" && (
+        <>
+          <h2>Payout wallet</h2>
+          <p>
+            Payouts are sent automatically in {config.erc20.token ? "USD stablecoin" : "dollars"} to this wallet each time you reach a
+            milestone.
+            {waitingMicros > 0 && (
+              <>
+                {" "}
+                <strong>{formatUsd(waitingMicros)}</strong> is waiting for you and goes out as soon as you add a wallet.
+              </>
+            )}
+          </p>
+          <form action="/api/account/wallet" method="post" className="inline" style={{ maxWidth: 560 }}>
+            <input name="wallet" defaultValue={account?.wallet ?? ""} placeholder="0x… your wallet address" aria-label="Wallet address" />
+            <button className="btn btn-small" type="submit">
+              Save wallet
+            </button>
+          </form>
+        </>
+      )}
 
       <h2>Fees from tokens</h2>
       <p>

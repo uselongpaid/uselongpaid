@@ -72,11 +72,23 @@ export function openDb(path: string): Db {
   return db;
 }
 
+function addColumn(db: Db, table: string, column: string, type: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+}
+
 function migrate(db: Db) {
-  const cols = db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[];
-  if (!cols.some((c) => c.name === "milestone_micros")) {
-    db.exec("ALTER TABLE accounts ADD COLUMN milestone_micros INTEGER NOT NULL DEFAULT 0");
-  }
+  addColumn(db, "accounts", "milestone_micros", "INTEGER NOT NULL DEFAULT 0");
+  // Wallet the account owner linked (after signing in with X) for automatic payouts.
+  addColumn(db, "accounts", "wallet", "TEXT");
+  // Set just before a payout is handed to the provider; cleared once it settles or is safe to retry.
+  addColumn(db, "payouts", "attempted_at", "INTEGER");
+  // Transaction hash or reference returned while a payout is in flight.
+  addColumn(db, "payouts", "attempt_ref", "TEXT");
+  // Free-form note from the dev who recorded the claim (asset amount, price used, etc.).
+  addColumn(db, "claims", "note", "TEXT");
+  // A claim transaction can only be recorded once.
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS claims_tx ON claims(tx_hash) WHERE tx_hash IS NOT NULL");
 }
 
 export function tx<T>(db: Db, fn: () => T): T {

@@ -66,6 +66,7 @@ export type AccountRow = {
   paid_micros: number;
   opted_out: number;
   milestone_micros: number;
+  wallet: string | null;
   created_at: number;
 };
 
@@ -87,6 +88,7 @@ export type ClaimRow = {
   recipient_micros: number;
   burn_micros: number;
   tx_hash: string | null;
+  note: string | null;
   created_at: number;
   symbol: string;
 };
@@ -117,6 +119,8 @@ export type PayoutRow = {
   amount_micros: number;
   status: "queued" | "paid" | "failed";
   provider_ref: string | null;
+  attempted_at: number | null;
+  attempt_ref: string | null;
   created_at: number;
   settled_at: number | null;
 };
@@ -166,4 +170,18 @@ export function earningsByToken(db: Db, handle: string) {
        WHERE t.handle = ? GROUP BY t.address ORDER BY earned DESC`,
     )
     .all(handle) as { address: string; symbol: string; name: string; claims: number; earned: number }[];
+}
+
+export type BurnRow = { id: number; amount_micros: number; status: "pending" | "done"; tx_hash: string | null; created_at: number };
+
+export function listBurns(db: Db, status?: BurnRow["status"], limit = 100): BurnRow[] {
+  return (
+    status
+      ? db.prepare("SELECT * FROM burns WHERE status = ? ORDER BY id DESC LIMIT ?").all(status, limit)
+      : db.prepare("SELECT * FROM burns ORDER BY id DESC LIMIT ?").all(limit)
+  ) as BurnRow[];
+}
+
+export function pendingBurnMicros(db: Db): number {
+  return (db.prepare("SELECT COALESCE(SUM(amount_micros),0) AS n FROM burns WHERE status = 'pending'").get() as { n: number }).n;
 }

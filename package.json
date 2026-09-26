@@ -1,5 +1,5 @@
 {
-  "name": "feeroute",
+  "name": "uselongpaid",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,9 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "test": "node --test --experimental-strip-types --no-warnings \"tests/**/*.test.ts\"",
-    "seed": "node --experimental-strip-types --no-warnings scripts/seed.ts",
-    "claim": "node --experimental-strip-types --no-warnings scripts/claim.ts"
+    "claim": "node --experimental-strip-types --no-warnings scripts/claim.ts",
+    "distribute": "node --experimental-strip-types --no-warnings scripts/distribute.ts",
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=22.13"

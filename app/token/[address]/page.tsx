@@ -19,8 +19,8 @@ export default async function Token({ params }: { params: Promise<{ address: str
         <h1>Token not found</h1>
         <p className="muted mono">{address}</p>
         <p className="notice">
-          This token isn't routing fees through us yet. Tokens appear after the next claim cycle once their creator-fee
-          beneficiary is our treasury and their metadata names an X handle.{" "}
+          This token isn't routing fees through us yet. Tokens appear once their creator-fee beneficiary is our treasury,
+          their metadata names an X handle, and the team has added them.{" "}
           <Link href={`/check?address=${address}`}>Check this token</Link> or read the <Link href="/launch">launch guide</Link>.
         </p>
       </div>

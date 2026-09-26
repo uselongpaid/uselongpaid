@@ -4,9 +4,8 @@ import { openDb } from "../lib/db.ts";
 import { recordClaim, setOptOut, settlePayout, upsertToken } from "../lib/ledger.ts";
 import { getAccount, getStats, listPayouts } from "../lib/queries.ts";
 import { runClaimCycle } from "../lib/claimer.ts";
-import { MockFeeSource } from "../lib/sources/mock.ts";
+import type { FeeSource } from "../lib/sources/types.ts";
 import { ManualPayoutProvider } from "../lib/payouts/manual.ts";
-import { DEMO_TOKENS } from "../lib/demo.ts";
 import { parseMilestones } from "../lib/milestones.ts";
 
 const opts = { recipientShareBps: 8000, milestones: parseMilestones(undefined, undefined) };
@@ -54,10 +53,26 @@ test("opted-out accounts receive nothing; the whole claim is burned", () => {
 
 test("claim cycle discovers tokens once and keeps the ledger balanced", async () => {
   const db = openDb(":memory:");
-  const source = new MockFeeSource(DEMO_TOKENS, 1);
+  // Test double for the automatic (longxyz) mode: 3 tokens, each with $12 of fees per claim.
+  const launched = ["a", "b", "c"].map((c, i) => ({
+    address: "0x" + c.repeat(40), chainId: 1, name: c, symbol: c.toUpperCase(), handle: `h${i}`, launchedAt: i,
+  }));
+  let n = 0;
+  const source: FeeSource = {
+    async discoverTokens(cursor) {
+      return { tokens: cursor ? [] : launched, cursor: "1" };
+    },
+    async claim() {
+      n++;
+      return { amountMicros: 12_000_000, txHash: "0x" + n.toString(16).padStart(64, "0") };
+    },
+    async inspect() {
+      return { exists: true, name: null, symbol: null, handle: null, routesToTreasury: true, pendingMicros: null };
+    },
+  };
   const r1 = await runClaimCycle(db, source, new ManualPayoutProvider(), opts);
   const r2 = await runClaimCycle(db, source, new ManualPayoutProvider(), opts);
-  assert.equal(r1.discovered, DEMO_TOKENS.length);
+  assert.equal(r1.discovered, launched.length);
   assert.equal(r2.discovered, 0);
   assert.equal(r1.errors.length + r2.errors.length, 0);
 

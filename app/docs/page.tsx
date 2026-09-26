@@ -35,7 +35,7 @@ export default function Docs() {
 }`}</pre>
           If the launch form only has a description, write <code>fees to @alice</code> in it.
         </li>
-        <li>The token appears on the site after the next claim cycle.</li>
+        <li>Send the token address to the team. They check the fee setup and add it, and it appears on the site.</li>
       </ol>
 
       <h2 id="split">Fee split</h2>
@@ -51,11 +51,17 @@ export default function Docs() {
       <h2 id="flow">Where the money goes</h2>
       <ol>
         <li>The token trades on long.xyz. Creator fees build up for our treasury.</li>
-        <li>On a schedule, the claimer claims each token's fees on-chain. Claiming on every trade would cost more in gas than quiet tokens earn.</li>
+        <li>
+          The team claims each token's fees on-chain regularly and records the claim with its transaction hash, which is checked
+          on-chain. Claiming on every trade would cost more in gas than quiet tokens earn.
+        </li>
         <li>
           Each claim is split: {share}% is credited to the X account in the token's metadata, {100 - share}% buys back and burns.
         </li>
-        <li>When the account crosses a milestone, its balance is sent in dollars to that X account.</li>
+        <li>
+          Everything after the claim is automatic: when the account crosses a milestone, its balance is sent in dollars
+          {config.payoutProvider === "erc20" ? " to the wallet linked to that X account" : " to that X account"}.
+        </li>
       </ol>
 
       <h2 id="payouts">Payouts</h2>
@@ -65,6 +71,12 @@ export default function Docs() {
         example, the account can't receive money yet), the amount goes back to the balance and goes out with the next
         milestone.
       </p>
+      {config.payoutProvider === "erc20" && (
+        <p>
+          To receive payouts, <a href="/account">sign in with X</a> and add a wallet. Payouts are sent as a dollar stablecoin.
+          Until you add one, your payouts wait for you; nothing is lost.
+        </p>
+      )}
 
       <h2 id="opt-out">Opting out</h2>
       <p>
@@ -79,7 +91,8 @@ GET  /api/tokens?sort=fees|new&q=   tokens routing fees
 GET  /api/profile/:handle           account, tokens, payouts, claims
 
 # Operator endpoints (Authorization: Bearer $CRON_SECRET)
-POST /api/cron/claim                run one claim cycle
+POST /api/cron/distribute           send queued payouts (run from cron)
+POST /api/cron/claim                automatic mode only: claim + distribute
 GET  /api/admin/payouts?status=queued
 POST /api/admin/payouts             {"id": 1, "ok": true, "ref": "x-money-ref"}
 POST /api/admin/opt-out             {"handle": "alice", "optedOut": true}`}</pre>

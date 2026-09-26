@@ -2,13 +2,11 @@ import "server-only";
 import { config } from "./config.ts";
 import { type Db, openDb } from "./db.ts";
 import type { LedgerOptions } from "./ledger.ts";
-import { MockFeeSource } from "./sources/mock.ts";
 import { LongXyzFeeSource } from "./sources/longxyz.ts";
 import type { FeeSource } from "./sources/types.ts";
-import { ManualPayoutProvider } from "./payouts/manual.ts";
-import { WebhookPayoutProvider } from "./payouts/webhook.ts";
 import type { PayoutProvider } from "./payouts/types.ts";
-import { DEMO_TOKENS } from "./demo.ts";
+import { createPayoutProvider } from "./providers.ts";
+import { ManualFeeSource } from "./sources/manual.ts";
 
 const g = globalThis as unknown as { __db?: Db };
 
@@ -23,14 +21,15 @@ export function ledgerOptions(): LedgerOptions {
 
 export function feeSource(): FeeSource {
   if (config.feeSource === "longxyz") return new LongXyzFeeSource(config.long);
-  return new MockFeeSource(DEMO_TOKENS, Date.now() & 0xffff);
+  return manualSource();
+}
+
+export function manualSource(): ManualFeeSource {
+  return new ManualFeeSource(config.long.rpcUrl);
 }
 
 export function payoutProvider(): PayoutProvider {
-  if (config.payoutProvider === "webhook") {
-    return new WebhookPayoutProvider(config.payoutWebhookUrl, config.payoutWebhookSecret);
-  }
-  return new ManualPayoutProvider();
+  return createPayoutProvider();
 }
 
 /** Constant-time check of a bearer token against CRON_SECRET. */

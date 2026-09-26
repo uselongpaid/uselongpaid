@@ -6,6 +6,7 @@ import type { PayoutProvider } from "./types.ts";
  */
 export class ManualPayoutProvider implements PayoutProvider {
   readonly name = "manual";
+  readonly retrySafe = true;
   async send() {
     return null;
   }

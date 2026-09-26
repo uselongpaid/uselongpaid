@@ -53,14 +53,20 @@ export default function Home() {
           <div className="step">
             <div className="n">02</div>
             <h3>We claim the fees</h3>
-            <p>Every cycle, the claimer collects pending creator fees on-chain and credits them to that X account.</p>
+            <p>The team claims creator fees on-chain regularly. Every claim is published with its transaction and credited to that X account.</p>
           </div>
           <div className="step">
             <div className="n">03</div>
             <h3>Paid in dollars</h3>
             <p>
               The first payout goes out at {formatUsd(config.milestones.list[0])} earned, then at every milestone after that.
-              Each one sends the full balance. No wallet or sign-up needed.
+              Each one sends the full balance automatically.
+              {config.payoutProvider === "erc20" ? (
+                <>
+                  {" "}
+                  <Link href="/account">Sign in with X</Link> and add a wallet to receive it.
+                </>
+              ) : null}
             </p>
           </div>
         </div>

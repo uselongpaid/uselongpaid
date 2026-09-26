@@ -1,10 +1,10 @@
 import { createHmac } from "node:crypto";
-import type { PayoutProvider, PayoutResult } from "./types.ts";
+import type { PayoutProvider, PayoutRequest, PayoutResult } from "./types.ts";
 
 /**
  * Sends each payout to an operator-run service that pays the X account (for example through X Money).
  *
- * Request: POST JSON {id, idempotencyKey, handle, amountMicros, amountUsd, currency}
+ * Request: POST JSON {id, idempotencyKey, handle, wallet, amountMicros, amountUsd, currency}
  *   headers  x-feeroute-timestamp: <unix ms>
  *            x-feeroute-signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>" with the shared secret>
  * Response: 200 {"status": "sent", "ref": "..."}    -> payout marked paid
@@ -15,6 +15,7 @@ import type { PayoutProvider, PayoutResult } from "./types.ts";
  */
 export class WebhookPayoutProvider implements PayoutProvider {
   readonly name = "webhook";
+  readonly retrySafe = true;
 
   private url: string;
   private secret: string;
@@ -28,11 +29,12 @@ export class WebhookPayoutProvider implements PayoutProvider {
     this.fetchImpl = fetchImpl;
   }
 
-  async send(p: { id: number; handle: string; amountMicros: number }): Promise<PayoutResult | null> {
+  async send(p: PayoutRequest): Promise<PayoutResult | null> {
     const body = JSON.stringify({
       id: p.id,
       idempotencyKey: `payout-${p.id}`,
       handle: p.handle,
+      wallet: p.wallet,
       amountMicros: p.amountMicros,
       amountUsd: (p.amountMicros / 1_000_000).toFixed(2),
       currency: "USD",

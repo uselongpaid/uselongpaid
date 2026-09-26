@@ -40,8 +40,13 @@ export function recordClaim(
   tokenAddress: string,
   amountMicros: number,
   txHash: string | null,
+  note: string | null = null,
 ): { claimId: number; payoutId: number | null } {
+  if (!Number.isInteger(amountMicros) || amountMicros <= 0) throw new Error("claim amount must be positive");
   return tx(db, () => {
+    if (txHash && db.prepare("SELECT 1 FROM claims WHERE tx_hash = ?").get(txHash)) {
+      throw new Error(`transaction ${txHash} is already recorded`);
+    }
     const token = db.prepare("SELECT handle FROM tokens WHERE address = ?").get(tokenAddress.toLowerCase()) as
       | { handle: string }
       | undefined;
@@ -58,10 +63,10 @@ export function recordClaim(
 
     const claim = db
       .prepare(
-        `INSERT INTO claims (token, handle, amount_micros, recipient_micros, burn_micros, tx_hash, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO claims (token, handle, amount_micros, recipient_micros, burn_micros, tx_hash, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(tokenAddress.toLowerCase(), token.handle, amountMicros, recipient, burn, txHash, now);
+      .run(tokenAddress.toLowerCase(), token.handle, amountMicros, recipient, burn, txHash, note, now);
     db.prepare("UPDATE tokens SET fees_micros = fees_micros + ? WHERE address = ?").run(amountMicros, tokenAddress.toLowerCase());
     db.prepare(
       "UPDATE accounts SET balance_micros = balance_micros + ?, lifetime_micros = lifetime_micros + ? WHERE handle = ?",
@@ -99,11 +104,19 @@ export function settlePayout(db: Db, id: number, result: { ok: true; ref: string
     if (!p) throw new Error(`unknown payout ${id}`);
     if (p.status !== "queued") throw new Error(`payout ${id} is already ${p.status}`);
     if (result.ok) {
-      db.prepare("UPDATE payouts SET status = 'paid', provider_ref = ?, settled_at = ? WHERE id = ?").run(result.ref, Date.now(), id);
+      db.prepare("UPDATE payouts SET status = 'paid', provider_ref = ?, settled_at = ?, attempted_at = NULL WHERE id = ?").run(
+        result.ref,
+        Date.now(),
+        id,
+      );
       db.prepare("UPDATE accounts SET paid_micros = paid_micros + ? WHERE handle = ?").run(p.amount_micros, p.handle);
     } else {
       // Return the money to the balance; it goes out with the next milestone payout.
-      db.prepare("UPDATE payouts SET status = 'failed', provider_ref = ?, settled_at = ? WHERE id = ?").run(result.reason, Date.now(), id);
+      db.prepare("UPDATE payouts SET status = 'failed', provider_ref = ?, settled_at = ?, attempted_at = NULL WHERE id = ?").run(
+        result.reason,
+        Date.now(),
+        id,
+      );
       db.prepare("UPDATE accounts SET balance_micros = balance_micros + ? WHERE handle = ?").run(p.amount_micros, p.handle);
     }
   });
@@ -112,4 +125,27 @@ export function settlePayout(db: Db, id: number, result: { ok: true; ref: string
 export function setOptOut(db: Db, handle: string, optedOut: boolean) {
   ensureAccount(db, handle);
   db.prepare("UPDATE accounts SET opted_out = ? WHERE handle = ?").run(optedOut ? 1 : 0, handle);
+}
+
+/** Links (or clears) the wallet an account's automatic payouts are sent to. */
+export function setWallet(db: Db, handle: string, wallet: string | null) {
+  ensureAccount(db, handle);
+  db.prepare("UPDATE accounts SET wallet = ? WHERE handle = ?").run(wallet, handle);
+}
+
+/** Records that a pending buyback-and-burn was executed. */
+export function markBurnDone(db: Db, id: number, txHash: string) {
+  const r = db.prepare("UPDATE burns SET status = 'done', tx_hash = ? WHERE id = ? AND status = 'pending'").run(txHash, id);
+  if (r.changes === 0) throw new Error(`burn ${id} is not pending`);
+}
+
+/** Marks every pending burn as done with one transaction (a single buyback can cover many claims). */
+export function markAllBurnsDone(db: Db, txHash: string): number {
+  return Number(db.prepare("UPDATE burns SET status = 'done', tx_hash = ? WHERE status = 'pending'").run(txHash).changes);
+}
+
+/** Clears a stuck in-flight marker after an admin has checked the payout didn't go out. */
+export function resetPayoutAttempt(db: Db, id: number) {
+  const r = db.prepare("UPDATE payouts SET attempted_at = NULL, attempt_ref = NULL WHERE id = ? AND status = 'queued'").run(id);
+  if (r.changes === 0) throw new Error(`payout ${id} is not queued`);
 }
