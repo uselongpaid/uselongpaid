@@ -64,7 +64,7 @@ export default function Home() {
               {config.payoutProvider === "erc20" ? (
                 <>
                   {" "}
-                  <Link href="/account">Sign in with X</Link> and add a wallet to receive it.
+                  <Link href="/wallet">Connect a wallet</Link> and link your X account to receive it.
                 </>
               ) : null}
             </p>

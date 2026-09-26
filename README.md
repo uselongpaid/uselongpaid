@@ -25,8 +25,8 @@ everything is automatic:
 - **80%** is credited to the X account, **20%** is set aside to buy back and burn.
 - Every time the account's lifetime earnings cross a milestone — **$5, $10, $20, $50, $100, $250, $500, $1,000**, then every
   **$1,000** — its full unpaid balance is paid out.
-- Payouts go on-chain as a USD stablecoin to the wallet the account owner linked by signing in with X. Until they link one,
-  the money waits for them — nothing is lost.
+- Payouts go on-chain on **Robinhood Chain** as a USD stablecoin to the wallet the account owner connected and verified.
+  Until they link one, the money waits for them — nothing is lost.
 
 > Feeroute is an independent project. It is not affiliated with long.xyz, X, or UsePaid.
 
@@ -37,6 +37,7 @@ everything is automatic:
 - [Architecture](#architecture)
 - [The money flow in detail](#the-money-flow-in-detail)
 - [Payout safety](#payout-safety)
+- [Linking a payout wallet](#linking-a-payout-wallet)
 - [Data model](#data-model)
 - [Running it](#running-it)
 - [Operating it](#operating-it)
@@ -66,7 +67,8 @@ sequenceDiagram
     D->>F: Record claim (USD value + tx hash)
     F->>B: Verify tx receipt succeeded
     F->>F: Split 80/20 · credit @handle · check milestones
-    X->>F: Sign in with X · link wallet
+    X->>F: Connect wallet · sign message · post code from X
+    D->>F: Check the post · approve wallet link
     F->>B: Transfer stablecoin to wallet (automatic)
     F-->>X: Payout shows as paid with tx hash
 ```
@@ -83,7 +85,8 @@ after that — the split, milestone tracking, queueing and the on-chain payout �
 | **Token pages** | `/token/:address` — fees claimed, amount sent to the account, amount burned, every claim. |
 | **Launch guide** | `/launch` — copy the treasury address, generate the metadata JSON and description line for a handle. |
 | **Eligibility checker** | `/check` — reads the token from chain and shows whether it's registered and where its fees go. |
-| **Account** | `/account` — Sign in with X (OAuth 2.0 + PKCE). Link a payout wallet, see what's waiting, opt out or back in. |
+| **Connect wallet** | Header button for any EIP-1193 browser wallet (MetaMask, Rabby, …). Adds and switches to Robinhood Chain automatically. |
+| **Payout wallet** | `/wallet` — link an X handle to the connected wallet (signature + X post), see earnings, paid out and waiting per handle, and request status. |
 | **Admin** | `/admin` — register tokens (name and symbol read from chain), record claims with on-chain tx verification, watch the payout queue and payout wallet balance, settle or retry payouts, record buyback-and-burn transactions, manage opt-outs. |
 | **Automatic distribution** | Runs after every recorded claim, when an owner links a wallet, and from cron. |
 | **Pluggable payout rails** | `erc20` (on-chain stablecoin), `webhook` (HMAC-signed call to your own payout service), `manual`. |
@@ -94,7 +97,7 @@ after that — the split, milestone tracking, queueing and the on-chain payout �
 flowchart LR
     subgraph Web["Next.js app (App Router)"]
         Pages["Public pages<br/>/ · /profile · /token · /check · /launch"]
-        Account["/account<br/>Sign in with X"]
+        Account["/wallet<br/>Connect wallet"]
         Admin["/admin<br/>password session"]
         API["/api/*<br/>JSON + cron"]
     end
@@ -186,6 +189,20 @@ out before the receipt came back. Feeroute never guesses in that case.
 5. Providers that dedupe on their own side (`webhook`, keyed on `idempotencyKey`) declare `retrySafe = true` and are retried
    automatically.
 
+## Linking a payout wallet
+
+Anyone can put any @handle in token metadata, so the owner of that handle has to prove it before money moves. There's no
+X login. The flow uses a wallet signature plus a public post:
+
+1. **Connect wallet** on `/wallet`. The site asks the wallet to add or switch to Robinhood Chain.
+2. **Sign** a message naming the handle, the wallet, the chain ID and a timestamp. This is free and sends no transaction.
+3. **Post** the code shown (`FR-XXXXXXXX`, derived from the signature) from that X account, then paste the post's link.
+4. The server **verifies the signature** (`POST /api/wallet/link`) and stores a pending request.
+5. An admin opens the post, confirms the **author** is that handle and the code matches, then approves in `/admin`.
+   Approving sets the wallet, rejects competing requests for the handle, and immediately sends anything that was waiting.
+
+Changing wallets works the same way. The admin sees the wallet being replaced before approving.
+
 ## Data model
 
 | Table | Purpose |
@@ -195,6 +212,7 @@ out before the receipt came back. Feeroute never guesses in that case.
 | `claims` | Every recorded claim: amount, recipient/burn split, unique `tx_hash`, note. |
 | `payouts` | `queued` → `paid` / `failed`, with `provider_ref`, `attempted_at` and `attempt_ref` for in-flight tracking. |
 | `burns` | Burn shares: `pending` → `done` with the burn tx hash. |
+| `wallet_links` | Wallet-link requests: handle, wallet, signed message, signature, code, post URL, `pending` → `approved` / `rejected`. |
 | `kv` | Small key-value store (sync cursors for automatic mode). |
 
 The ledger always balances, and the tests check it:
@@ -248,6 +266,10 @@ Schedule distribution so late wallet links and payouts that waited on a top-up g
    note, for example `0.42 NVDA @ $298.50`.
 3. Submit. The result message shows the split, whether a milestone was hit, and what was paid out.
 
+**Approving wallet links**
+
+- In `/admin` → **Wallet link requests**, open each post. Approve only if the author is that handle and the code matches.
+
 **Keeping payouts flowing**
 
 - Keep the payout wallet funded with the stablecoin plus gas. Its balance is shown at the top of `/admin`.
@@ -267,9 +289,10 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `SESSION_SECRET` | yes | Signs session cookies. `openssl rand -hex 32` |
 | `ADMIN_PASSWORD` | yes | Password for `/admin`. |
 | `CRON_SECRET` | yes | Bearer token for `/api/cron/*` and the JSON admin API. |
-| `APP_URL` | yes | Public URL. Used for OAuth callbacks and same-origin checks. |
+| `APP_URL` | yes | Public URL. Used for same-origin checks. |
+| `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_CHAIN_NAME`, `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_EXPLORER_URL` | | Chain for Connect wallet and the default for every RPC. Defaults to Robinhood Chain mainnet (`4663`). Set at build time. |
 | `DATABASE_PATH` | | SQLite file. Default `./data/feeroute.db`. |
-| `LONG_RPC_URL`, `LONG_CHAIN_ID` | yes | Chain long.xyz runs on: verifies claim txs and reads token info. |
+| `LONG_RPC_URL`, `LONG_CHAIN_ID` | | RPC for claim-tx verification, wallet signatures and token info. Defaults to the chain above; use a dedicated provider in production. |
 | `TREASURY_ADDRESS` | yes | Fee beneficiary shown in the launch guide. |
 | `RECIPIENT_SHARE_BPS` | | Account share in basis points. Default `8000` (80%). |
 | `PAYOUT_MILESTONES_USD`, `PAYOUT_MILESTONE_STEP_USD` | | Milestone schedule. Default `5,10,20,50,100,250,500,1000` and `1000`. |
@@ -278,7 +301,6 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `PAYOUT_PRIVATE_KEY` | erc20 | Hot wallet that holds the payout float. **Not** the treasury key. |
 | `PAYOUT_RPC_URL`, `PAYOUT_CHAIN_ID` | | Payout chain, if different from the long.xyz chain. |
 | `PAYOUT_WEBHOOK_URL`, `PAYOUT_WEBHOOK_SECRET` | webhook | Your payout service and HMAC secret. |
-| `X_CLIENT_ID`, `X_CLIENT_SECRET` | yes | OAuth 2.0 app from developer.x.com, callback `$APP_URL/auth/x/callback`. |
 | `EXPLORER_TX_URL` | | For example `https://explorer.example/tx/{hash}`, for tx links in `/admin`. |
 | `FEE_SOURCE` | | `manual` (default). `longxyz` enables automatic claiming via the `LONG_*` contract settings. |
 
@@ -324,14 +346,14 @@ app/
   profile/[handle]/        public account page
   token/[address]/         public token page
   launch/  check/          launch guide, eligibility checker
-  account/                 Sign in with X, wallet, opt-out
+  wallet/                  connect wallet, link X handle, payout status
   admin/                   dashboard + login
   api/
     admin/action/          every admin form (tokens, claims, payouts, burns, opt-out)
-    account/wallet/        link wallet → triggers distribution
+    wallet/link/           verify signature, store link request
+    wallet/[address]/      what a wallet receives
     cron/distribute/       scheduled distribution
     stats/ tokens/ profile/ public JSON
-  auth/x/                  OAuth 2.0 + PKCE flow
 components/                Tables, FeesChart, LiveStats, Avatar, Logo, MetadataBuilder
 lib/
   ledger.ts                claims, split, milestones, settlement (transactional)
@@ -360,7 +382,7 @@ npm run build       # production build
 
 The suites cover the split and rounding, milestone crossing (including multi-milestone jumps), ledger balance invariants,
 duplicate-claim rejection, opt-out, the distribution engine (waiting for a wallet, paying once, holding ambiguous failures,
-retrying safe ones), webhook signing and error mapping, signed sessions and PKCE, and handle parsing. CI runs all three
+retrying safe ones), webhook signing and error mapping, wallet-link signatures and approvals, signed sessions, and handle parsing. CI runs all three
 commands on every push and pull request.
 
 The `erc20` payout path has also been run end to end against a local EVM chain with a deployed stablecoin contract: admin
@@ -372,9 +394,11 @@ login → register token → record claim (tx verified on-chain) → owner links
   float. Keep both in your host's secret manager, never in the repo.
 - **Admin:** password login with a constant-time comparison and a delay on failures. The session cookie is HMAC-signed,
   `httpOnly` and `SameSite=Strict`, and expires after 12 hours.
-- **X sign-in:** OAuth 2.0 authorization code flow with PKCE and a signed, single-use state cookie. Only `users.read` and
-  `tweet.read` are requested, and the app never posts.
-- **Forms:** every state-changing request checks the `Origin` header against `APP_URL`, and cookies are `SameSite`.
+- **Wallet links:** a payout wallet is only set after two proofs. The wallet signs a message naming the handle, the wallet
+  and the chain (EIP-191, and ERC-1271 for smart wallets via the RPC; signatures expire after an hour). The X account posts
+  a code derived from that signature, and an admin checks the post's author before approving. Connecting a wallet alone
+  can never redirect anyone's payouts.
+- **Forms:** every state-changing request checks the `Origin` header against `APP_URL`, and the admin cookie is `SameSite=Strict`.
 - **Integrity:** claim tx hashes are unique and verified on-chain. Ledger writes are transactional. Payouts can't be queued
   or sent twice (see [Payout safety](#payout-safety)).
 - **Opt-out:** anyone can put any handle in token metadata, so owners can refuse. Their share is then burned.

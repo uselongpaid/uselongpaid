@@ -185,3 +185,39 @@ export function listBurns(db: Db, status?: BurnRow["status"], limit = 100): Burn
 export function pendingBurnMicros(db: Db): number {
   return (db.prepare("SELECT COALESCE(SUM(amount_micros),0) AS n FROM burns WHERE status = 'pending'").get() as { n: number }).n;
 }
+
+export type LinkRow = {
+  id: number;
+  handle: string;
+  wallet: string;
+  code: string;
+  tweet_url: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: number;
+  decided_at: number | null;
+};
+
+export function listLinkRequests(db: Db, opts: { status?: LinkRow["status"]; wallet?: string; limit?: number } = {}): LinkRow[] {
+  const where: string[] = [];
+  const args: (string | number)[] = [];
+  if (opts.status) {
+    where.push("status = ?");
+    args.push(opts.status);
+  }
+  if (opts.wallet) {
+    where.push("lower(wallet) = lower(?)");
+    args.push(opts.wallet);
+  }
+  args.push(opts.limit ?? 100);
+  return db
+    .prepare(
+      `SELECT id, handle, wallet, code, tweet_url, status, created_at, decided_at FROM wallet_links
+       ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY id DESC LIMIT ?`,
+    )
+    .all(...args) as LinkRow[];
+}
+
+/** Accounts whose payouts go to this wallet. */
+export function accountsForWallet(db: Db, wallet: string): AccountRow[] {
+  return db.prepare("SELECT * FROM accounts WHERE lower(wallet) = lower(?) ORDER BY lifetime_micros DESC").all(wallet) as AccountRow[];
+}

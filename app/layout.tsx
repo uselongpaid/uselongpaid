@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { config } from "@/lib/config.ts";
 import { Logo } from "@/components/Logo.tsx";
+import { WalletProvider } from "@/components/WalletProvider.tsx";
+import { ConnectButton } from "@/components/ConnectButton.tsx";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,18 +16,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <WalletProvider>
         <header className="site">
           <div className="wrap">
             <Link href="/" className="brand">
               <Logo size={26} /> {config.appName}
             </Link>
-            <nav className="links">
-              <Link href="/launch">Launch</Link>
-              <Link href="/check">Check</Link>
-              <Link href="/leaderboard">Leaderboard</Link>
-              <Link href="/docs">Docs</Link>
-              <Link href="/account">Account</Link>
-            </nav>
+            <div className="nav-right">
+              <nav className="links">
+                <Link href="/launch">Launch</Link>
+                <Link href="/check">Check</Link>
+                <Link href="/leaderboard">Leaderboard</Link>
+                <Link href="/docs">Docs</Link>
+              </nav>
+              <ConnectButton />
+            </div>
           </div>
         </header>
         <main className="wrap">{children}</main>
@@ -34,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {config.appName} is an independent project. It is not affiliated with long.xyz or X.
           </div>
         </footer>
+        </WalletProvider>
       </body>
     </html>
   );

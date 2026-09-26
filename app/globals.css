@@ -196,3 +196,14 @@ li.check .muted { font-size: 14px; }
 form.inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 form.inline input { min-width: 0; flex: 1; font-size: 13px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- wallet --- */
+.nav-right { display: flex; align-items: center; gap: 20px; min-width: 0; }
+.wallet-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); font: 600 13px var(--mono); text-decoration: none; white-space: nowrap;
+}
+.chain-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.docs .panel { margin: 20px 0; }
+.docs .panel h2 { margin-top: 0; }
+@media (max-width: 560px) { .nav-right { width: 100%; justify-content: space-between; gap: 10px; } }

@@ -58,6 +58,21 @@ CREATE TABLE IF NOT EXISTS burns (
   created_at     INTEGER NOT NULL
 );
 
+-- Requests to link an X handle to a payout wallet; an admin approves after checking the X post.
+CREATE TABLE IF NOT EXISTS wallet_links (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  handle      TEXT NOT NULL,
+  wallet      TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  signature   TEXT NOT NULL,
+  code        TEXT NOT NULL,
+  tweet_url   TEXT NOT NULL,
+  status      TEXT NOT NULL CHECK (status IN ('pending','approved','rejected')),
+  created_at  INTEGER NOT NULL,
+  decided_at  INTEGER
+);
+CREATE INDEX IF NOT EXISTS wallet_links_status ON wallet_links(status);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 

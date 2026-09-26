@@ -48,7 +48,8 @@ export default function Launch() {
         </li>
       </ol>
       <p className="muted" style={{ fontSize: 14 }}>
-        Anyone named in a token can <Link href="/account">opt out</Link>. Please only name accounts that want to receive fees.
+        Anyone named in a token can opt out. Please only name accounts that want to receive fees. The account owner collects
+        payouts by <Link href="/wallet">connecting a wallet</Link>.
       </p>
     </div>
   );

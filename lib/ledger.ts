@@ -149,3 +149,39 @@ export function resetPayoutAttempt(db: Db, id: number) {
   const r = db.prepare("UPDATE payouts SET attempted_at = NULL, attempt_ref = NULL WHERE id = ? AND status = 'queued'").run(id);
   if (r.changes === 0) throw new Error(`payout ${id} is not queued`);
 }
+
+export type LinkRequest = { handle: string; wallet: string; message: string; signature: string; code: string; tweetUrl: string };
+
+/** Stores a wallet-link request. A repeat from the same handle and wallet replaces the pending one. */
+export function createLinkRequest(db: Db, r: LinkRequest): number {
+  return tx(db, () => {
+    const pending = db.prepare("SELECT COUNT(*) AS n FROM wallet_links WHERE status = 'pending'").get() as { n: number };
+    if (pending.n >= 1000) throw new Error("too many pending requests, try again later");
+    db.prepare("DELETE FROM wallet_links WHERE status = 'pending' AND handle = ? AND wallet = ?").run(r.handle, r.wallet);
+    const res = db
+      .prepare(
+        `INSERT INTO wallet_links (handle, wallet, message, signature, code, tweet_url, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      )
+      .run(r.handle, r.wallet, r.message, r.signature, r.code, r.tweetUrl, Date.now());
+    return Number(res.lastInsertRowid);
+  });
+}
+
+/** Approving sets the account's payout wallet and closes other pending requests for that handle. */
+export function decideLinkRequest(db: Db, id: number, approve: boolean): { handle: string; wallet: string } {
+  return tx(db, () => {
+    const r = db.prepare("SELECT handle, wallet, status FROM wallet_links WHERE id = ?").get(id) as
+      | { handle: string; wallet: string; status: string }
+      | undefined;
+    if (!r) throw new Error(`unknown request ${id}`);
+    if (r.status !== "pending") throw new Error(`request ${id} is already ${r.status}`);
+    const now = Date.now();
+    db.prepare("UPDATE wallet_links SET status = ?, decided_at = ? WHERE id = ?").run(approve ? "approved" : "rejected", now, id);
+    if (approve) {
+      setWallet(db, r.handle, r.wallet);
+      db.prepare("UPDATE wallet_links SET status = 'rejected', decided_at = ? WHERE handle = ? AND status = 'pending'").run(now, r.handle);
+    }
+    return { handle: r.handle, wallet: r.wallet };
+  });
+}

@@ -5,7 +5,7 @@ import { sameOrigin } from "@/lib/auth.ts";
 import { isAdmin } from "@/lib/admin.ts";
 import { normalizeHandle } from "@/lib/handle.ts";
 import { formatUsd, parseUsd } from "@/lib/money.ts";
-import { markAllBurnsDone, recordClaim, resetPayoutAttempt, setOptOut, settlePayout, upsertToken } from "@/lib/ledger.ts";
+import { decideLinkRequest, markAllBurnsDone, recordClaim, resetPayoutAttempt, setOptOut, settlePayout, upsertToken } from "@/lib/ledger.ts";
 import { getToken } from "@/lib/queries.ts";
 import { distributePending, type DistributionReport } from "@/lib/distribute.ts";
 import { db, ledgerOptions, manualSource, payoutProvider } from "@/lib/server.ts";
@@ -110,6 +110,15 @@ export async function POST(req: Request) {
         if (!TX_RE.test(txHash)) return back({ err: "Enter the buyback-and-burn transaction hash." });
         const n = markAllBurnsDone(d, txHash);
         return back({ msg: `${n} pending burn(s) marked done.` });
+      }
+
+      case "link-approve":
+      case "link-reject": {
+        const approve = s("action") === "link-approve";
+        const { handle, wallet } = decideLinkRequest(d, Number(s("id")), approve);
+        if (!approve) return back({ msg: `Rejected the request for @${handle}.` });
+        const dist = await distributePending(d, payoutProvider(), { handle });
+        return back({ msg: `@${handle} now gets paid to ${wallet}. ${summarize(dist)}.` });
       }
 
       case "opt-out": {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { config } from "@/lib/config.ts";
 import { isAdmin } from "@/lib/admin.ts";
 import { formatUsd } from "@/lib/money.ts";
-import { getStats, listPayouts, listTokens, pendingBurnMicros, recentClaims } from "@/lib/queries.ts";
+import { getAccount, getStats, listLinkRequests, listPayouts, listTokens, pendingBurnMicros, recentClaims } from "@/lib/queries.ts";
 import { db, payoutProvider } from "@/lib/server.ts";
 import { Erc20PayoutProvider } from "@/lib/payouts/erc20.ts";
 import { shortAddr, timeAgo } from "@/components/Tables.tsx";
@@ -36,6 +36,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     .all() as (ReturnType<typeof listPayouts>[number] & { wallet: string | null })[];
   const recentPayouts = listPayouts(d, { limit: 15 }).filter((p) => p.status !== "queued");
   const burnPending = pendingBurnMicros(d);
+  const links = listLinkRequests(d, { status: "pending", limit: 100 });
 
   let provider = config.payoutProvider as string;
   let walletInfo: string | null = null;
@@ -161,6 +162,64 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           </form>
         </section>
       </div>
+
+      <section>
+        <h2>Wallet link requests</h2>
+        <p className="muted" style={{ fontSize: 14 }}>
+          The signature already proves the wallet. Open the post and approve only if it was made by the same X account and shows
+          the same code. Post links work with any name in the path, so check the author on X, not just the URL.
+        </p>
+        {links.length === 0 ? (
+          <div className="empty">No pending requests.</div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>X account</th>
+                  <th>Wallet</th>
+                  <th>Code</th>
+                  <th>Post</th>
+                  <th>Replaces</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {links.map((l) => {
+                  const current = getAccount(d, l.handle)?.wallet;
+                  return (
+                    <tr key={l.id}>
+                      <td>
+                        <Link href={`/profile/${l.handle}`}>@{l.handle}</Link>
+                        <div className="muted" style={{ fontSize: 12 }}>{timeAgo(l.created_at)}</div>
+                      </td>
+                      <td className="mono">{shortAddr(l.wallet)}</td>
+                      <td className="mono">{l.code}</td>
+                      <td>
+                        <a href={l.tweet_url} target="_blank" rel="noreferrer">
+                          Open post
+                        </a>
+                      </td>
+                      <td className="mono muted">{current ? shortAddr(current) : "—"}</td>
+                      <td>
+                        <form action="/api/admin/action" method="post" className="inline">
+                          <input type="hidden" name="id" value={l.id} />
+                          <button className="btn btn-small" type="submit" name="action" value="link-approve">
+                            Approve
+                          </button>
+                          <button className="btn btn-ghost btn-small" type="submit" name="action" value="link-reject">
+                            Reject
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section>
         <div className="admin-head">

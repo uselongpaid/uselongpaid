@@ -1,4 +1,5 @@
 import { parseMilestones } from "./milestones.ts";
+import { chain } from "./chain.ts";
 
 function num(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -10,6 +11,7 @@ function num(name: string, fallback: number): number {
 
 export const config = {
   appName: process.env.NEXT_PUBLIC_APP_NAME || "Feeroute",
+  chain,
   databasePath: process.env.DATABASE_PATH || "./data/feeroute.db",
   cronSecret: process.env.CRON_SECRET || "",
   recipientShareBps: num("RECIPIENT_SHARE_BPS", 8000),
@@ -17,10 +19,12 @@ export const config = {
   feeSource: (process.env.FEE_SOURCE || "manual") as "manual" | "longxyz",
   payoutProvider: (process.env.PAYOUT_PROVIDER || "manual") as "manual" | "webhook" | "erc20",
   adminPassword: process.env.ADMIN_PASSWORD || "",
-  explorerTxUrl: process.env.EXPLORER_TX_URL || "",
+  explorerTxUrl: process.env.EXPLORER_TX_URL || `${chain.explorerUrl}/tx/{hash}`,
+  /** A wallet-link request must be signed within this window. */
+  linkMaxAgeMs: 60 * 60_000,
   erc20: {
-    rpcUrl: process.env.PAYOUT_RPC_URL || process.env.LONG_RPC_URL || "",
-    chainId: num("PAYOUT_CHAIN_ID", num("LONG_CHAIN_ID", 0)),
+    rpcUrl: process.env.PAYOUT_RPC_URL || process.env.LONG_RPC_URL || chain.rpcUrl,
+    chainId: num("PAYOUT_CHAIN_ID", num("LONG_CHAIN_ID", chain.id)),
     token: process.env.PAYOUT_TOKEN_ADDRESS || "",
     decimals: num("PAYOUT_TOKEN_DECIMALS", 6),
     privateKey: process.env.PAYOUT_PRIVATE_KEY || "",
@@ -29,11 +33,9 @@ export const config = {
   payoutWebhookSecret: process.env.PAYOUT_WEBHOOK_SECRET || "",
   appUrl: (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, ""),
   sessionSecret: process.env.SESSION_SECRET || "",
-  xClientId: process.env.X_CLIENT_ID || "",
-  xClientSecret: process.env.X_CLIENT_SECRET || "",
   long: {
-    rpcUrl: process.env.LONG_RPC_URL || "",
-    chainId: num("LONG_CHAIN_ID", 0),
+    rpcUrl: process.env.LONG_RPC_URL || chain.rpcUrl,
+    chainId: num("LONG_CHAIN_ID", chain.id),
     treasury: process.env.TREASURY_ADDRESS || "",
     privateKey: process.env.TREASURY_PRIVATE_KEY || "",
     feeContract: process.env.LONG_FEE_CONTRACT || "",

@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 // Small signed-cookie helpers: value = base64url(json) + "." + base64url(hmac).
 
@@ -29,14 +29,3 @@ export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString("base64url");
 }
 
-/** PKCE S256 code challenge for a verifier. */
-export function pkceChallenge(verifier: string): string {
-  return createHash("sha256").update(verifier).digest("base64url");
-}
-
-export const SESSION_COOKIE = "fr_session";
-export const OAUTH_COOKIE = "fr_oauth";
-export const SESSION_TTL_MS = 7 * 86_400_000;
-
-export type Session = { handle: string; exp: number };
-export type OAuthState = { state: string; verifier: string; exp: number };

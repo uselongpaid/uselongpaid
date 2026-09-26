@@ -73,16 +73,16 @@ export default function Docs() {
       </p>
       {config.payoutProvider === "erc20" && (
         <p>
-          To receive payouts, <a href="/account">sign in with X</a> and add a wallet. Payouts are sent as a dollar stablecoin.
-          Until you add one, your payouts wait for you; nothing is lost.
+          To receive payouts, <a href="/wallet">connect a wallet</a> on {config.chain.name}, sign a message, and post the code it
+          gives you from your X account. Once the team confirms the post, payouts are sent to that wallet as a dollar stablecoin,
+          automatically. Until then your payouts wait for you; nothing is lost.
         </p>
       )}
 
       <h2 id="opt-out">Opting out</h2>
       <p>
         Anyone can put any handle in token metadata, so account owners can opt out. After that, no money is credited to them:
-        fees from tokens naming their handle are burned in full. To opt out, sign in with X on the{" "}
-        <a href="/account">account page</a>.
+        fees from tokens naming their handle are burned in full. To opt out, contact the team from your X account.
       </p>
 
       <h2 id="api">API</h2>
