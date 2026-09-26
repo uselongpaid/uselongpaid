@@ -10,8 +10,10 @@ import { FeesChart } from "@/components/FeesChart.tsx";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ notfound?: string }> }) {
+  const { notfound } = await searchParams;
   const d = db();
+  const feeHandle = config.detect.handle ? `@${config.detect.handle}` : config.appName;
   const stats = getStats(d);
   const share = config.recipientShareBps / 100;
 
@@ -22,10 +24,15 @@ export default function Home() {
           Send long.xyz token fees to <span className="hl">any X account.</span>
         </h1>
         <p className="lede">
-          Launch a token on long.xyz with {config.appName} as its fee beneficiary and name an X handle. We claim the creator fees
-          on-chain and pay {share}% of them out to that account in dollars. The other {100 - share}% buys back and burns.
+          Launch on app.long.xyz, send the fees to {feeHandle} and write <strong>fees @yourhandle</strong> in the bio.{" "}
+          {share}% of the creator fees are paid out to that X account in dollars. The other {100 - share}% buys back and burns.
         </p>
         <Lookup />
+        {notfound !== undefined && (
+          <p className="field-error" style={{ marginTop: 10 }}>
+            &quot;{notfound}&quot; isn&apos;t an X handle or a token address. Try @handle or 0x…
+          </p>
+        )}
         <div className="hero-actions">
           <Link href="/launch">Launch a token →</Link>
           <Link href="/check">Check a token →</Link>
@@ -44,10 +51,10 @@ export default function Home() {
         <div className="steps">
           <div className="step">
             <div className="n">01</div>
-            <h3>Launch on long.xyz</h3>
+            <h3>Launch on app.long.xyz</h3>
             <p>
-              Set the creator-fee beneficiary to the {config.appName} treasury and put an X handle in the token metadata.{" "}
-              <Link href="/launch">Launch guide.</Link>
+              Set the fee receiver to {feeHandle} and write <strong>fees @yourhandle</strong> in the bio. {config.appName} picks the
+              token up automatically. <Link href="/launch">Launch guide.</Link>
             </p>
           </div>
           <div className="step">

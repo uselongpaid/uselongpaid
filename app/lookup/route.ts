@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
 import { normalizeHandle } from "@/lib/handle.ts";
+import { redirectTo } from "@/lib/http.ts";
 
 export function GET(req: Request) {
-  const url = new URL(req.url);
-  const q = (url.searchParams.get("q") ?? "").trim();
-  if (/^0x[0-9a-fA-F]{40}$/.test(q)) return NextResponse.redirect(new URL(`/token/${q.toLowerCase()}`, url));
+  const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
+  if (/^0x[0-9a-fA-F]{40}$/.test(q)) return redirectTo(`/token/${q.toLowerCase()}`, 307);
   const handle = normalizeHandle(q);
-  if (handle) return NextResponse.redirect(new URL(`/profile/${handle}`, url));
-  return NextResponse.redirect(new URL("/", url));
+  if (handle) return redirectTo(`/profile/${handle}`, 307);
+  return redirectTo(`/?notfound=${encodeURIComponent(q)}`, 307);
 }

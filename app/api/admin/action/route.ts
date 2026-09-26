@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAddress, getAddress } from "viem";
 import { config } from "@/lib/config.ts";
 import { sameOrigin } from "@/lib/auth.ts";
+import { redirectTo } from "@/lib/http.ts";
 import { isAdmin } from "@/lib/admin.ts";
 import { normalizeHandle } from "@/lib/handle.ts";
 import { formatUsd, parseUsd } from "@/lib/money.ts";
@@ -18,7 +19,7 @@ export const maxDuration = 300;
 const TX_RE = /^0x[0-9a-fA-F]{64}$/;
 
 function back(params: Record<string, string>) {
-  return NextResponse.redirect(`${config.appUrl}/admin?${new URLSearchParams(params)}`, 303);
+  return redirectTo(`/admin?${new URLSearchParams(params)}`);
 }
 
 function summarize(r: DistributionReport): string {
@@ -33,7 +34,7 @@ function summarize(r: DistributionReport): string {
 /** Every admin form posts here with an `action` field. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "bad origin" }, { status: 403 });
-  if (!(await isAdmin())) return NextResponse.redirect(`${config.appUrl}/admin/login`, 303);
+  if (!(await isAdmin())) return redirectTo("/admin/login");
   const f = await req.formData();
   const s = (k: string) => String(f.get(k) ?? "").trim();
   const d = db();
