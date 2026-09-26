@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { config } from "@/lib/config.ts";
+import { Logo } from "@/components/Logo.tsx";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="site">
           <div className="wrap">
             <Link href="/" className="brand">
-              <span className="dot" /> {config.appName}
+              <Logo size={26} /> {config.appName}
             </Link>
             <nav className="links">
               <Link href="/launch">Launch</Link>
