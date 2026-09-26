@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatUsd } from "@/lib/money.ts";
-import { getToken } from "@/lib/queries.ts";
+import { getDetected, getToken } from "@/lib/queries.ts";
+import { config } from "@/lib/config.ts";
 import { db, feeSource } from "@/lib/server.ts";
 import type { Inspection } from "@/lib/sources/types.ts";
 
@@ -37,7 +38,9 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
     }
   }
   const tracked = valid ? getToken(db(), address) : null;
-  const handle = tracked?.handle ?? inspection?.handle ?? null;
+  const detected = valid ? getDetected(db(), address) : null;
+  const handle = tracked?.handle ?? detected?.handle ?? inspection?.handle ?? null;
+  const handleLabel = config.detect.handle ? `@${config.detect.handle}` : config.appName;
 
   return (
     <div className="docs">
@@ -61,12 +64,12 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
           </h2>
           <ul className="checks">
             <Row
-              ok={inspection.exists ?? (tracked ? true : null)}
+              ok={inspection.exists ?? (tracked || detected ? true : null)}
               title="Token contract found"
               detail={
                 inspection.exists === null
-                  ? tracked
-                    ? "Registered by the team."
+                  ? tracked || detected
+                    ? "Seen on chain by LongPaid."
                     : "Not checked."
                   : inspection.exists
                     ? "We can read this token."
@@ -74,30 +77,44 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
               }
             />
             <Row
-              ok={inspection.routesToTreasury ?? (tracked ? true : null)}
-              title="Creator fees go to our treasury"
+              ok={detected ? true : tracked ? true : null}
+              title={`Fees sent to ${handleLabel}`}
               detail={
-                inspection.routesToTreasury === null
-                  ? tracked
-                    ? "Confirmed by the team when the token was added."
-                    : "Checked by the team when they add the token."
-                  : inspection.routesToTreasury
-                    ? `Pending fees: ${inspection.pendingMicros === null ? "unknown" : formatUsd(inspection.pendingMicros)}`
-                    : "The fee beneficiary isn't our treasury, so we can't claim for it."
+                detected
+                  ? "Confirmed in the launch transaction on long.xyz."
+                  : tracked
+                    ? "Added by the team."
+                    : `Not seen yet. New launches are picked up within a few minutes if their fee receiver is ${handleLabel}.`
               }
             />
             <Row
-              ok={handle ? true : null}
-              title="X handle in metadata"
-              detail={handle ? <Link href={`/profile/${handle}`}>@{handle}</Link> : "No handle found. Add feeRecipient, x or twitter to the metadata."}
+              ok={handle ? true : detected?.status === "needs_handle" ? false : null}
+              title="Bio says who earns the fees"
+              detail={
+                handle ? (
+                  <Link href={`/profile/${handle}`}>@{handle}</Link>
+                ) : detected?.status === "needs_handle" ? (
+                  "No “fees @handle” found in the bio. The team can assign it by hand."
+                ) : (
+                  "Write “fees @handle” in the token bio."
+                )
+              }
             />
             <Row
               ok={Boolean(tracked)}
-              title="Picked up by the claimer"
-              detail={tracked ? <Link href={`/token/${tracked.address}`}>{formatUsd(tracked.fees_micros)} claimed so far</Link> : "Not yet. The team adds new tokens after checking their fee setup."}
+              title="Earning on LongPaid"
+              detail={
+                tracked ? (
+                  <Link href={`/token/${tracked.address}`}>{formatUsd(tracked.fees_micros)} claimed so far</Link>
+                ) : detected?.status === "pending" ? (
+                  "Found; reading its metadata."
+                ) : (
+                  "Not yet."
+                )
+              }
             />
           </ul>
-          {inspection.routesToTreasury === false || (!handle && !tracked) ? (
+          {!tracked && !detected ? (
             <p className="notice">
               This token isn't set up yet. Follow the <Link href="/launch">launch guide</Link>.
             </p>

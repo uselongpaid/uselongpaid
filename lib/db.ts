@@ -73,6 +73,26 @@ CREATE TABLE IF NOT EXISTS wallet_links (
 );
 CREATE INDEX IF NOT EXISTS wallet_links_status ON wallet_links(status);
 
+-- long.xyz launches whose fees are routed to a LongPaid wallet, found by scanning the factory.
+CREATE TABLE IF NOT EXISTS detected_launches (
+  asset        TEXT PRIMARY KEY,
+  tx_hash      TEXT NOT NULL,
+  block        INTEGER NOT NULL,
+  launched_at  INTEGER NOT NULL,
+  launcher     TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  symbol       TEXT NOT NULL,
+  token_uri    TEXT NOT NULL,
+  fee_wallet   TEXT NOT NULL,
+  handle       TEXT,
+  status       TEXT NOT NULL CHECK (status IN ('pending','registered','needs_handle','dismissed')),
+  note         TEXT,
+  attempts     INTEGER NOT NULL DEFAULT 0,
+  detected_at  INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS detected_launches_status ON detected_launches(status);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 

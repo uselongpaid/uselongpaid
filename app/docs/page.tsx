@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 
 export default function Docs() {
   const share = config.recipientShareBps / 100;
-  const treasury = config.long.treasury || "<treasury address>";
   return (
     <div className="docs">
       <h1>Docs</h1>
@@ -21,21 +20,21 @@ export default function Docs() {
       <h2 id="launch">Launching a token</h2>
       <ol>
         <li>
-          Create the token on long.xyz as usual and set the creator-fee beneficiary to:
-          <pre>{treasury}</pre>
+          Create the token on <a href="https://app.long.xyz">app.long.xyz</a> as usual.
         </li>
         <li>
-          Put the X handle in the token metadata. We check these fields in order: <code>feeRecipient</code>, <code>x</code>,{" "}
-          <code>twitter</code>. Values like <code>@alice</code> and <code>https://x.com/alice</code> both work.
-          <pre>{`{
-  "name": "Moon Nvidia",
-  "symbol": "MOON",
-  "description": "gm",
-  "feeRecipient": "@alice"
-}`}</pre>
-          If the launch form only has a description, write <code>fees to @alice</code> in it.
+          Set the fee receiver to <code>@{config.detect.handle || "longpaid"}</code>. long.xyz then pays the creator fees to{" "}
+          {config.appName}.
         </li>
-        <li>Send the token address to the team. They check the fee setup and add it, and it appears on the site.</li>
+        <li>
+          Write who earns them in the token bio: <code>fees @alice</code>. <code>fees to @alice</code>,{" "}
+          <code>fee send @alice</code> and <code>fees: @alice</code> work too.
+        </li>
+        <li>
+          Launch. {config.appName} scans every long.xyz launch and picks yours up within a few minutes. It checks the launch
+          transaction itself, so only tokens whose fees really reach {config.appName} are counted; the bio only says who gets
+          them.
+        </li>
       </ol>
 
       <h2 id="split">Fee split</h2>

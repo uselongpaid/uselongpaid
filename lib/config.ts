@@ -33,6 +33,20 @@ export const config = {
   payoutWebhookSecret: process.env.PAYOUT_WEBHOOK_SECRET || "",
   appUrl: (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, ""),
   sessionSecret: process.env.SESSION_SECRET || "",
+  /** Detecting launches on app.long.xyz that send their fees to LongPaid. */
+  detect: {
+    factory: process.env.LONG_FACTORY_ADDRESS || "0x1Eef016F22A943abC7DD11422EDeE9D235942104",
+    /** LongPaid's X account: what creators type as fee receiver on app.long.xyz. */
+    handle: (process.env.LONGPAID_X_HANDLE || "").replace(/^@/, "").toLowerCase(),
+    /** Wallet(s) long.xyz pays LongPaid's fees to (the long.xyz wallet of that X account). */
+    feeWallets: (process.env.LONGPAID_FEE_WALLETS || process.env.TREASURY_ADDRESS || "")
+      .split(",")
+      .map((w) => w.trim())
+      .filter((w) => /^0x[0-9a-fA-F]{40}$/.test(w)),
+    startBlock: process.env.LONG_FACTORY_START_BLOCK ? BigInt(process.env.LONG_FACTORY_START_BLOCK) : undefined,
+    /** Background scan interval inside the web process; 0 turns it off (use the cron route instead). */
+    intervalMs: num("LONG_SYNC_INTERVAL_MS", 120_000),
+  },
   long: {
     rpcUrl: process.env.LONG_RPC_URL || chain.rpcUrl,
     chainId: num("LONG_CHAIN_ID", chain.id),

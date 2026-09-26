@@ -9,6 +9,8 @@ import { decideLinkRequest, markAllBurnsDone, recordClaim, resetPayoutAttempt, s
 import { getToken } from "@/lib/queries.ts";
 import { distributePending, type DistributionReport } from "@/lib/distribute.ts";
 import { db, ledgerOptions, manualSource, payoutProvider } from "@/lib/server.ts";
+import { runLaunchSync } from "@/lib/detect.ts";
+import { registerDetected } from "@/lib/long/sync.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -119,6 +121,28 @@ export async function POST(req: Request) {
         if (!approve) return back({ msg: `Rejected the request for @${handle}.` });
         const dist = await distributePending(d, payoutProvider(), { handle });
         return back({ msg: `@${handle} now gets paid to ${wallet}. ${summarize(dist)}.` });
+      }
+
+      case "sync-launches": {
+        const r = await runLaunchSync();
+        const parts = [`Scanned blocks ${r.from}–${r.to}: ${r.scanned} launch(es), ${r.routedToUs} routed to LongPaid`];
+        if (r.registered.length) parts.push(`registered ${r.registered.map((x) => `$${x.symbol} → @${x.handle}`).join(", ")}`);
+        if (r.needsHandle.length) parts.push(`${r.needsHandle.length} need a handle`);
+        if (!r.caughtUp) parts.push("still catching up, run again");
+        if (r.errors.length) parts.push(`errors: ${r.errors.join("; ")}`);
+        return back({ msg: parts.join(". ") + "." });
+      }
+
+      case "assign-handle": {
+        const handle = normalizeHandle(s("handle"));
+        if (!handle) return back({ err: "X handle isn't valid." });
+        registerDetected(d, s("asset"), handle, config.chain.id);
+        return back({ msg: `Registered, fees go to @${handle}.` });
+      }
+
+      case "dismiss-launch": {
+        d.prepare("UPDATE detected_launches SET status = 'dismissed', updated_at = ? WHERE asset = ?").run(Date.now(), s("asset").toLowerCase());
+        return back({ msg: "Launch dismissed." });
       }
 
       case "opt-out": {

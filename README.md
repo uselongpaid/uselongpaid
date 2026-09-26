@@ -18,9 +18,10 @@
 
 ---
 
-A token launched on long.xyz names the LongPaid treasury as its **creator-fee beneficiary** and puts an **X handle** in its
-metadata. The team claims those fees on-chain and records each claim with its transaction hash. From that moment on,
-everything is automatic:
+A creator launches on **app.long.xyz** as usual, sets the fee receiver to **@LongPaid** and writes **`fees @handle`** in the
+token bio. LongPaid scans every long.xyz launch, confirms in the launch transaction that the fees really go to LongPaid,
+reads the handle from the bio and registers the token on its own. The team claims the fees on-chain and records each
+claim with its transaction hash. From that moment on, everything is automatic:
 
 - **80%** is credited to the X account, **20%** is set aside to buy back and burn.
 - Every time the account's lifetime earnings cross a milestone — **$5, $10, $20, $50, $100, $250, $500, $1,000**, then every
@@ -36,6 +37,7 @@ everything is automatic:
 - [Features](#features)
 - [Architecture](#architecture)
 - [The money flow in detail](#the-money-flow-in-detail)
+- [Detecting launches on app.long.xyz](#detecting-launches-on-applongxyz)
 - [Payout safety](#payout-safety)
 - [Linking a payout wallet](#linking-a-payout-wallet)
 - [Data model](#data-model)
@@ -60,8 +62,9 @@ sequenceDiagram
     participant X as Account owner
     participant B as Chain
 
-    C->>L: Launch token (beneficiary = treasury, metadata: feeRecipient=@handle)
-    D->>F: Register token → @handle
+    C->>L: Launch on app.long.xyz (fee receiver @LongPaid, bio "fees @handle")
+    F->>B: Scan LaunchMetadata events · check fee beneficiary in launch tx
+    F->>F: Read "fees @handle" from the bio · register token
     L-->>B: Trading accrues creator fees to the treasury
     D->>B: Claim fees from the treasury
     D->>F: Record claim (USD value + tx hash)
@@ -189,6 +192,27 @@ out before the receipt came back. LongPaid never guesses in that case.
 5. Providers that dedupe on their own side (`webhook`, keyed on `idempotencyKey`) declare `retrySafe = true` and are retried
    automatically.
 
+## Detecting launches on app.long.xyz
+
+LongPaid doesn't launch tokens itself: long.xyz's `LongLaunchFactory`
+([`0x1Eef…2104`](https://robinhoodchain.blockscout.com/address/0x1Eef016F22A943abC7DD11422EDeE9D235942104)) only accepts
+launches signed by long.xyz's backend. Creators launch on app.long.xyz, and LongPaid watches the factory
+([`lib/long/sync.ts`](lib/long/sync.ts)):
+
+1. Reads every `LaunchMetadata(asset, launcher, details)` event: token, name, symbol, `tokenURI`.
+2. Decodes that launch's `launch(CreateParams, …)` calldata and checks that a LongPaid fee wallet (`LONGPAID_FEE_WALLETS`,
+   the long.xyz wallet of `@LONGPAID_X_HANDLE`) is one of the fee beneficiaries in `poolInitializerData`, as a whole 32-byte
+   word. **This is the only thing that makes a token count**; a bio can say anything.
+3. Fetches the metadata (`ipfs://` through public gateways) and reads the handle from the bio: `fees @alice`,
+   `fees to @alice`, `fee send @alice`, `fees: @alice` ([`feeHandleFromText`](lib/handle.ts)). LongPaid's own handle is
+   ignored.
+4. Both found → the token is registered for that handle. Routed but no handle (or metadata unreachable after 5 tries) →
+   it waits in `/admin` → **Launches on app.long.xyz**, where the admin assigns a handle or dismisses it.
+
+It runs every 2 minutes inside the web process (`instrumentation.ts`), from `POST /api/cron/sync-launches`,
+`npm run sync-launches`, or **Sync now** in `/admin`. A cursor in the database resumes where it stopped, and log ranges the
+RPC refuses are split in half until they fit.
+
 ## Linking a payout wallet
 
 Anyone can put any @handle in token metadata, so the owner of that handle has to prove it before money moves. There's no
@@ -212,6 +236,7 @@ Changing wallets works the same way. The admin sees the wallet being replaced be
 | `claims` | Every recorded claim: amount, recipient/burn split, unique `tx_hash`, note. |
 | `payouts` | `queued` → `paid` / `failed`, with `provider_ref`, `attempted_at` and `attempt_ref` for in-flight tracking. |
 | `burns` | Burn shares: `pending` → `done` with the burn tx hash. |
+| `detected_launches` | long.xyz launches routed to a LongPaid wallet: token, launch tx, fee wallet, handle, `pending` → `registered` / `needs_handle` / `dismissed`. |
 | `wallet_links` | Wallet-link requests: handle, wallet, signed message, signature, code, post URL, `pending` → `approved` / `rejected`. |
 | `kv` | Small key-value store (sync cursors for automatic mode). |
 
@@ -258,12 +283,18 @@ Schedule distribution so late wallet links and payouts that waited on a top-up g
 
 ## Operating it
 
+**Setting up**
+
+1. Log in to app.long.xyz with LongPaid's X account and copy its wallet address. Set `LONGPAID_X_HANDLE` and
+   `LONGPAID_FEE_WALLETS`.
+2. Do one test launch with fee receiver `@LONGPAID_X_HANDLE` and bio `fees @yourhandle`; within a few minutes it shows
+   as registered in `/admin` → **Launches on app.long.xyz**.
+
 **Onboarding a token**
 
-1. The creator launches on long.xyz with the treasury as fee beneficiary and `feeRecipient: "@handle"` in the metadata
-   (`/launch` generates it).
-2. The creator sends you the token address. Check the beneficiary on long.xyz.
-3. In `/admin` → **Add or update a token**, paste the address and handle. Name and symbol are read from chain.
+Nothing to do: tokens launched with the right fee receiver and bio register themselves. Only tokens listed under
+**Launches on app.long.xyz** as *needs handle* want attention. Tokens launched some other way can still be added by hand
+under **Add or update a token**.
 
 **Recording a claim**
 
@@ -308,6 +339,12 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `PAYOUT_RPC_URL`, `PAYOUT_CHAIN_ID` | | Payout chain, if different from the long.xyz chain. |
 | `PAYOUT_WEBHOOK_URL`, `PAYOUT_WEBHOOK_SECRET` | webhook | Your payout service and HMAC secret. |
 | `EXPLORER_TX_URL` | | For example `https://explorer.example/tx/{hash}`, for tx links in `/admin`. |
+| `LONGPAID_X_HANDLE` | yes | LongPaid's X account, the fee receiver creators enter on app.long.xyz. |
+| `LONGPAID_FEE_WALLETS` | yes | Wallet(s) long.xyz pays that account's fees to. Launches are only counted when one of these is a fee beneficiary. |
+| `LONG_FACTORY_ADDRESS` | | long.xyz's `LongLaunchFactory`. Default `0x1Eef016F22A943abC7DD11422EDeE9D235942104`. |
+| `LONG_FACTORY_START_BLOCK` | | First block to scan on a fresh database. Default: the current block. |
+| `LONG_SYNC_INTERVAL_MS` | | Background scan interval. Default `120000`; `0` turns it off. |
+| `IPFS_GATEWAYS` | | Gateways for `ipfs://` metadata. Default `https://ipfs.io/ipfs/,https://dweb.link/ipfs/`. |
 | `FEE_SOURCE` | | `manual` (default). `longxyz` enables automatic claiming via the `LONG_*` contract settings. |
 
 ## HTTP API
@@ -324,6 +361,7 @@ Operator (`Authorization: Bearer $CRON_SECRET`):
 
 ```http
 POST /api/cron/distribute               send queued payouts → DistributionReport
+POST /api/cron/sync-launches            scan long.xyz for launches routed to LongPaid → SyncReport
 GET  /api/admin/payouts?status=queued   list payouts
 POST /api/admin/payouts                 {"id": 1, "ok": true, "ref": "0x…"} settle by hand
 POST /api/admin/opt-out                 {"handle": "alice", "optedOut": true}
@@ -370,11 +408,13 @@ lib/
   queries.ts               read models for pages and API
   session.ts  auth.ts  admin.ts   signed cookies, X session, admin session
   sources/                 manual (default) · longxyz (automatic claiming)
+  long/                    long.xyz factory ABI, launch scanner (sync.ts) and chain reader
   payouts/                 erc20 · webhook · manual
   providers.ts             payout provider from config
 scripts/
   distribute.ts            `npm run distribute`
   claim.ts                 `npm run claim` (automatic mode only)
+  sync-launches.ts         `npm run sync-launches`
 tests/                     node:test suites
 ```
 

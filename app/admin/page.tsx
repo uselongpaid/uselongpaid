@@ -3,6 +3,8 @@ import Link from "next/link";
 import { config } from "@/lib/config.ts";
 import { isAdmin } from "@/lib/admin.ts";
 import { formatUsd } from "@/lib/money.ts";
+import { listDetected } from "@/lib/queries.ts";
+import { detectionEnabled } from "@/lib/detect.ts";
 import { getAccount, getStats, listLinkRequests, listPayouts, listTokens, pendingBurnMicros, recentClaims } from "@/lib/queries.ts";
 import { db, payoutProvider } from "@/lib/server.ts";
 import { Erc20PayoutProvider } from "@/lib/payouts/erc20.ts";
@@ -37,6 +39,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const recentPayouts = listPayouts(d, { limit: 15 }).filter((p) => p.status !== "queued");
   const burnPending = pendingBurnMicros(d);
   const links = listLinkRequests(d, { status: "pending", limit: 100 });
+  const needHandle = listDetected(d, "needs_handle", 100);
+  const recentDetected = listDetected(d, undefined, 10);
 
   let provider = config.payoutProvider as string;
   let walletInfo: string | null = null;
@@ -162,6 +166,100 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           </form>
         </section>
       </div>
+
+      <section>
+        <div className="admin-head">
+          <h2>Launches on app.long.xyz</h2>
+          <form action="/api/admin/action" method="post">
+            <input type="hidden" name="action" value="sync-launches" />
+            <button className="btn btn-small" type="submit" disabled={!detectionEnabled()}>
+              Sync now
+            </button>
+          </form>
+        </div>
+        {!detectionEnabled() ? (
+          <p className="notice">
+            Set LONGPAID_FEE_WALLETS to the wallet long.xyz pays {config.detect.handle ? `@${config.detect.handle}` : "LongPaid's X account"}
+            {" "}to, then launches that send fees to it are found automatically.
+          </p>
+        ) : (
+          <p className="muted" style={{ fontSize: 14 }}>
+            Found automatically every {Math.round(config.detect.intervalMs / 60_000) || "few"} min: launches whose fee receiver is{" "}
+            {config.detect.handle ? `@${config.detect.handle}` : "LongPaid"} ({config.detect.feeWallets.map((w) => shortAddr(w)).join(", ")}). A bio with
+            &quot;fees @handle&quot; registers the token on its own; the rest wait here.
+          </p>
+        )}
+        {needHandle.length > 0 && (
+          <div className="table-wrap" style={{ marginBottom: 16 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Why</th>
+                  <th>Launch tx</th>
+                  <th>Assign handle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {needHandle.map((l) => (
+                  <tr key={l.asset}>
+                    <td>
+                      <strong>${l.symbol}</strong> <span className="muted">{l.name}</span>
+                      <div className="mono muted">{shortAddr(l.asset)}</div>
+                    </td>
+                    <td className="muted">{l.note}</td>
+                    <td>
+                      <TxLink hash={l.tx_hash} />
+                    </td>
+                    <td>
+                      <form action="/api/admin/action" method="post" className="inline">
+                        <input type="hidden" name="asset" value={l.asset} />
+                        <input name="handle" placeholder="@handle" />
+                        <button className="btn btn-small" type="submit" name="action" value="assign-handle">
+                          Register
+                        </button>
+                        <button className="btn btn-ghost btn-small" type="submit" name="action" value="dismiss-launch" formNoValidate>
+                          Dismiss
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {recentDetected.length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Fees to</th>
+                  <th>Status</th>
+                  <th>Launched</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentDetected.map((l) => (
+                  <tr key={l.asset}>
+                    <td>
+                      <Link href={`/token/${l.asset}`}>${l.symbol}</Link> <span className="muted">{l.name}</span>
+                    </td>
+                    <td>{l.handle ? <Link href={`/profile/${l.handle}`}>@{l.handle}</Link> : <span className="muted">—</span>}</td>
+                    <td>
+                      <span className={`pill ${l.status === "registered" ? "paid" : l.status === "needs_handle" ? "failed" : ""}`}>{l.status.replace("_", " ")}</span>
+                    </td>
+                    <td className="muted">{timeAgo(l.launched_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          detectionEnabled() && <div className="empty">No launches routed to LongPaid yet.</div>
+        )}
+      </section>
 
       <section>
         <h2>Wallet link requests</h2>

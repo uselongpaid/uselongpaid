@@ -221,3 +221,31 @@ export function listLinkRequests(db: Db, opts: { status?: LinkRow["status"]; wal
 export function accountsForWallet(db: Db, wallet: string): AccountRow[] {
   return db.prepare("SELECT * FROM accounts WHERE lower(wallet) = lower(?) ORDER BY lifetime_micros DESC").all(wallet) as AccountRow[];
 }
+
+export type DetectedRow = {
+  asset: string;
+  tx_hash: string;
+  block: number;
+  launched_at: number;
+  launcher: string;
+  name: string;
+  symbol: string;
+  token_uri: string;
+  fee_wallet: string;
+  handle: string | null;
+  status: "pending" | "registered" | "needs_handle" | "dismissed";
+  note: string | null;
+  detected_at: number;
+};
+
+export function listDetected(db: Db, status?: DetectedRow["status"], limit = 50): DetectedRow[] {
+  return (
+    status
+      ? db.prepare("SELECT * FROM detected_launches WHERE status = ? ORDER BY block DESC LIMIT ?").all(status, limit)
+      : db.prepare("SELECT * FROM detected_launches ORDER BY block DESC LIMIT ?").all(limit)
+  ) as DetectedRow[];
+}
+
+export function getDetected(db: Db, asset: string): DetectedRow | null {
+  return (db.prepare("SELECT * FROM detected_launches WHERE asset = ?").get(asset.toLowerCase()) as DetectedRow | undefined) ?? null;
+}
