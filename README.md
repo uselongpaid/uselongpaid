@@ -244,6 +244,11 @@ Deploy it as **one long-running Node process with a persistent disk** for `DATAB
 with a volume. Serverless platforms with ephemeral filesystems will lose the database. Back up the SQLite file regularly,
 for example with `sqlite3 longpaid.db ".backup backup.db"` from cron.
 
+**Railway:** the repo includes `railway.json` (build `npm ci && npm run build`, start `npm start`, health check on
+`/api/version`) and `.nvmrc` (Node 22). Add a **Volume** mounted at `/data` and set `DATABASE_PATH=/data/longpaid.db`,
+or the database is wiped on every deploy. After a deploy, open `/api/version`: `commit` must match the latest commit on
+`main`.
+
 Schedule distribution so late wallet links and payouts that waited on a top-up go out on their own:
 
 ```cron
