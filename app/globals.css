@@ -385,3 +385,9 @@ form.inline input { min-width: 0; flex: 1; font-size: 13px; }
 .project-coin-ca { display: flex; }
 .project-coin-ca .copy-label { margin: 0; flex: none; }
 .project-coin-ca code { flex: 1; min-width: 0; text-align: left; white-space: nowrap; }
+.coin-logo-empty { display: grid; place-items: center; font-size: 44px; font-weight: 800; color: var(--muted); }
+.coin-hero .project-coin-price { margin-left: auto; align-self: flex-end; }
+.coin-live-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 4px; flex-wrap: wrap; }
+@media (max-width: 700px) { .coin-hero .project-coin-price { margin-left: 0; } }
+.coin-card-featured { margin-bottom: 16px; border-color: #2f5f3f; background: linear-gradient(90deg, rgba(74, 222, 128, 0.06), var(--surface) 60%); }
+.coin-card-featured .coin-card-meta { flex-wrap: wrap; word-break: break-all; }

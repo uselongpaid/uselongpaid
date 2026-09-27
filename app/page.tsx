@@ -11,6 +11,7 @@ import { XIcon } from "@/components/XIcon.tsx";
 import { FeeFlow } from "@/components/FeeFlow.tsx";
 import { CoinCard } from "@/components/CoinCard.tsx";
 import { ProjectCoin } from "@/components/ProjectCoin.tsx";
+import { marketWithin } from "@/lib/marketData.ts";
 import { listCoins } from "@/lib/coins.ts";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
   const feeHandle = config.detect.handle ? `@${config.detect.handle}` : config.appName;
   const stats = getStats(d);
   const coins = listCoins(d, { limit: 6 });
+  const projectMarket = config.projectCoin.mint ? await marketWithin(config.projectCoin.mint) : null;
   const share = config.recipientShareBps / 100;
 
   const minMilestone = formatUsd(config.milestones.list[0]);
@@ -114,6 +116,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
         <ProjectCoin
           mint={config.projectCoin.mint}
           fallbackSymbol={config.projectCoin.symbol}
+          initial={projectMarket}
           tradeUrl={config.launchpad.tokenUrl.replace("{mint}", config.projectCoin.mint)}
           explorerUrl={config.chain.explorerUrl}
         />

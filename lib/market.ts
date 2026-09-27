@@ -19,8 +19,4 @@ export async function coinStats(mint: string): Promise<TokenStats | null> {
   return stats;
 }
 
-export function fmtUsd(n: number | null, compact = true): string {
-  if (n === null) return "—";
-  if (n > 0 && n < 0.01) return `$${n.toPrecision(3)}`;
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD", notation: compact && n >= 10_000 ? "compact" : "standard", maximumFractionDigits: n < 1 ? 6 : 2 });
-}
+export { fmtUsd } from "./format.ts";

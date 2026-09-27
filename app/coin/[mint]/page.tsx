@@ -6,7 +6,9 @@ import { config } from "@/lib/config.ts";
 import { db } from "@/lib/server.ts";
 import { isSolanaAddress } from "@/lib/address.ts";
 import { coinBio, coinImage, coinSocials, getCoin } from "@/lib/coins.ts";
-import { coinStats, fmtUsd } from "@/lib/market.ts";
+import { marketWithin } from "@/lib/marketData.ts";
+import { CoinLive } from "@/components/CoinLive.tsx";
+import { ExternalCoin } from "@/components/ExternalCoin.tsx";
 import { launcher } from "@/lib/launch-api.ts";
 import { CopyButton } from "@/components/CopyButton.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
@@ -19,7 +21,10 @@ type Params = { params: Promise<{ mint: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { mint } = await params;
   const c = isSolanaAddress(mint) ? getCoin(db(), mint) : null;
-  if (!c) return { title: `Coin · ${config.appName}` };
+  if (!c) {
+    const m = isSolanaAddress(mint) ? await marketWithin(mint, 2000) : null;
+    return { title: m?.symbol ? `$${m.symbol}${m.name ? ` (${m.name})` : ""} · ${config.appName}` : `Coin · ${config.appName}`, openGraph: m?.image ? { images: [m.image] } : undefined };
+  }
   return {
     title: `${c.name} ($${c.symbol}) · ${config.appName}`,
     description: coinBio(c) || `${c.name} on ${config.launchpad.name}`,
@@ -31,14 +36,32 @@ export default async function Coin({ params }: Params) {
   const { mint } = await params;
   if (!isSolanaAddress(mint)) notFound();
   let c = getCoin(db(), mint);
-  if (!c) notFound();
+  if (!c) {
+    // Not launched here: LongPaid's own coin, or any coin with market data, gets a live market page.
+    const isProject = mint === config.projectCoin.mint;
+    const market = await marketWithin(mint, 5000);
+    if (!isProject && !market?.symbol && !market?.chartUrl) notFound();
+    return (
+      <ExternalCoin
+        mint={mint}
+        market={market}
+        official={isProject}
+        fallbackSymbol={isProject ? config.projectCoin.symbol : ""}
+        explorerUrl={config.chain.explorerUrl}
+        tradeUrl={config.launchpad.tokenUrl.replace("{mint}", mint)}
+        network={config.launchpad.network}
+        launchpad={config.launchpad.name}
+        appName={config.appName}
+      />
+    );
+  }
   // Settle a launch whose confirmation or listing hasn't been seen yet.
   if (config.launch.enabled && (c.status === "submitted" || !c.listed)) c = (await launcher().refresh(c.id).catch(() => c)) ?? c;
 
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto")?.split(",")[0] ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
   const pageUrl = `${origin}/coin/${mint}`;
-  const stats = await coinStats(mint);
+  const market = await marketWithin(mint);
   const socials = coinSocials(c);
   const bio = coinBio(c);
   const explorer = config.chain.explorerUrl;
@@ -62,7 +85,6 @@ export default async function Coin({ params }: Params) {
             ) : (
               <span className="pill">listing soon</span>
             )}
-            {stats?.graduated && <span className="pill paid">graduated</span>}
           </div>
           <h1>
             {c.name} <span className="muted">${c.symbol}</span>
@@ -117,53 +139,7 @@ export default async function Coin({ params }: Params) {
         </div>
       )}
 
-      <div className="stats">
-        <div className="stat">
-          <div className="label">Market cap</div>
-          <div className="value">{fmtUsd(stats?.marketCapUsd ?? null)}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Price</div>
-          <div className="value">{fmtUsd(stats?.priceUsd ?? null, false)}</div>
-        </div>
-        <div className="stat">
-          <div className="label">24h volume</div>
-          <div className="value">{fmtUsd(stats?.volume24hUsd ?? null)}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Holders</div>
-          <div className="value">{stats?.holders?.toLocaleString("en-US") ?? "—"}</div>
-        </div>
-      </div>
-
-      {stats?.progress !== null && stats?.progress !== undefined && !stats.graduated && (
-        <div className="coin-progress" aria-label="Bonding curve progress">
-          <div className="coin-progress-head">
-            <span>Bonding curve</span>
-            <span className="mono">{stats.progress.toFixed(1)}%</span>
-          </div>
-          <div className="coin-progress-bar">
-            <span style={{ width: `${stats.progress}%` }} />
-          </div>
-        </div>
-      )}
-
-      <section>
-        <h2>Chart</h2>
-        <div className="coin-chart">
-          <iframe
-            title={`${c.symbol} chart`}
-            src={`https://dexscreener.com/solana/${mint}?embed=1&theme=dark&info=0&trades=0`}
-            loading="lazy"
-          />
-        </div>
-        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Chart not showing yet? New coins appear on charts after their first trades.{" "}
-          <a href={`https://dexscreener.com/solana/${mint}`} target="_blank" rel="noreferrer">
-            Open on DEX Screener
-          </a>
-        </p>
-      </section>
+      <CoinLive mint={mint} initial={market} symbol={c.symbol} />
 
       <div className="two-col coin-lower">
         <section>
@@ -205,12 +181,6 @@ export default async function Coin({ params }: Params) {
                     {shortAddr(c.signature)}
                   </a>
                 </dd>
-              </>
-            )}
-            {stats?.quoteSymbol && (
-              <>
-                <dt>Pair</dt>
-                <dd>{stats.quoteSymbol}</dd>
               </>
             )}
           </dl>
