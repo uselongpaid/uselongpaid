@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { config } from "@/lib/config.ts";
 import { marketWithin } from "@/lib/marketData.ts";
@@ -24,7 +24,8 @@ export default async function Coin({ params }: Params) {
   const { address } = await params;
   if (!valid(address)) notFound();
   const a = address.toLowerCase();
-  const official = a === config.projectCoin.address;
+  if (a === config.projectCoin.address) redirect("/ca");
+  const official = false;
   const market = await marketWithin(a, 5000);
   if (!official && !market?.symbol && !market?.chartUrl) notFound();
   return (

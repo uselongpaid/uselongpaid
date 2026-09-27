@@ -65,7 +65,7 @@ export function ProjectCoin({
         <a className="btn" href={buyUrl} target="_blank" rel="noreferrer">
           {buyLabel}
         </a>
-        <Link className="btn btn-ghost" href={`/coin/${mint}`}>
+        <Link className="btn btn-ghost" href="/ca">
           Coin page
         </Link>
         {m?.pairUrl && (

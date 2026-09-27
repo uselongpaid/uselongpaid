@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {config.projectCoin.address && (
                 <p className="footer-ca">
                   <span className="copy-label">CA</span>{" "}
-                  <a className="mono" href="/#coin">
+                  <a className="mono" href="/ca">
                     {config.projectCoin.address}
                   </a>
                 </p>
