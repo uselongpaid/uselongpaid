@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="https://uselongpaid.xyz"><strong>uselongpaid.xyz</strong></a> · <a href="https://x.com/uselongpaid">@uselongpaid on X</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/uselongpaid/uselongpaid/actions/workflows/ci.yml"><img src="https://github.com/uselongpaid/uselongpaid/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs" alt="Next.js 16" />
   <img src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white" alt="TypeScript strict" />
