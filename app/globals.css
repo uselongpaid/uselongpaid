@@ -276,3 +276,4 @@ form.inline input { min-width: 0; flex: 1; font-size: 13px; }
 @media (max-width: 560px) {
   nav.links { width: auto; flex: 1; justify-content: flex-start; gap: 16px; }
 }
+.inline-copy { display: flex; align-items: center; gap: 8px; }

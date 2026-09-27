@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <XIcon size={15} />
                 </a>
               )}
-              <ConnectButton />
+              {config.payoutProvider === "erc20" && <ConnectButton />}
             </div>
           </div>
         </header>
@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="copy-label">Product</span>
               <Link href="/launch">Launch guide</Link>
               <Link href="/check">Check a token</Link>
-              <Link href="/wallet">Claim your fees</Link>
+              {config.payoutProvider === "erc20" && <Link href="/wallet">Claim your fees</Link>}
               <Link href="/leaderboard">Leaderboard</Link>
             </div>
             <div className="footer-links">

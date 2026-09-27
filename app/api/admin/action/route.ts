@@ -24,7 +24,9 @@ function back(params: Record<string, string>) {
 
 function summarize(r: DistributionReport): string {
   const parts = [`${r.sent.length} payout(s) sent`];
-  if (r.waiting) parts.push(`${r.waiting} waiting for a wallet`);
+  if (r.waiting) {
+    parts.push(config.payoutProvider === "xmoney" ? `${r.waiting} ready to send on X Money` : `${r.waiting} waiting for a wallet`);
+  }
   if (r.failed.length) parts.push(`${r.failed.length} failed`);
   if (r.needsReview.length) parts.push(`${r.needsReview.length} need review`);
   if (r.errors.length) parts.push(`errors: ${r.errors.map((e) => `#${e.id} ${e.message}`).join("; ")}`);
@@ -90,10 +92,10 @@ export async function POST(req: Request) {
 
       case "mark-paid": {
         const id = Number(s("id"));
-        const ref = s("ref");
+        const ref = s("ref") || (config.payoutProvider === "xmoney" ? "X Money" : "");
         if (!ref) return back({ err: "Enter the payment reference or tx hash." });
         settlePayout(d, id, { ok: true, ref });
-        return back({ msg: `Payout #${id} marked paid.` });
+        return back({ msg: `Payout #${id} marked ${config.payoutProvider === "xmoney" ? "sent on X Money" : "paid"}.` });
       }
 
       case "mark-failed": {

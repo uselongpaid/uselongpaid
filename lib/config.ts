@@ -17,7 +17,8 @@ export const config = {
   recipientShareBps: num("RECIPIENT_SHARE_BPS", 8000),
   milestones: parseMilestones(process.env.PAYOUT_MILESTONES_USD, process.env.PAYOUT_MILESTONE_STEP_USD),
   feeSource: (process.env.FEE_SOURCE || "manual") as "manual" | "longxyz",
-  payoutProvider: (process.env.PAYOUT_PROVIDER || "manual") as "manual" | "webhook" | "erc20",
+  /** xmoney (default): sent by hand from LongPaid's X Money balance to each @handle. erc20: automatic to a linked wallet. */
+  payoutProvider: (process.env.PAYOUT_PROVIDER || "xmoney") as "xmoney" | "manual" | "webhook" | "erc20",
   adminPassword: process.env.ADMIN_PASSWORD || "",
   explorerTxUrl: process.env.EXPLORER_TX_URL || `${chain.explorerUrl}/tx/{hash}`,
   /** A wallet-link request must be signed within this window. */

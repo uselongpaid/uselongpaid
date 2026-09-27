@@ -59,7 +59,12 @@ export default function Docs() {
         </li>
         <li>
           Everything after the claim is automatic: when the account crosses a milestone, its balance is sent in dollars
-          {config.payoutProvider === "erc20" ? " to the wallet linked to that X account" : " to that X account"}.
+          {config.payoutProvider === "erc20"
+            ? " to the wallet linked to that X account"
+            : config.payoutProvider === "xmoney"
+              ? " to that X account through X Money"
+              : " to that X account"}
+          .
         </li>
       </ol>
 
@@ -70,6 +75,13 @@ export default function Docs() {
         example, the account can't receive money yet), the amount goes back to the balance and goes out with the next
         milestone.
       </p>
+      {config.payoutProvider === "xmoney" && (
+        <p>
+          Payouts are sent in dollars through X Money, straight to the @handle, from {config.appName}&apos;s X Money balance. The
+          account owner doesn&apos;t need to connect a wallet or sign up. If an account can&apos;t receive X Money yet, the payout
+          goes back to its balance and is sent with the next milestone.
+        </p>
+      )}
       {config.payoutProvider === "erc20" && (
         <p>
           To receive payouts, <a href="/wallet">connect a wallet</a> on {config.chain.name}, sign a message, and post the code it

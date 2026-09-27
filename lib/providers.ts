@@ -3,6 +3,7 @@ import { config } from "./config.ts";
 import { Erc20PayoutProvider } from "./payouts/erc20.ts";
 import { ManualPayoutProvider } from "./payouts/manual.ts";
 import { WebhookPayoutProvider } from "./payouts/webhook.ts";
+import { XMoneyPayoutProvider } from "./payouts/xmoney.ts";
 import type { PayoutProvider } from "./payouts/types.ts";
 
 let cached: PayoutProvider | undefined;
@@ -14,7 +15,9 @@ export function createPayoutProvider(): PayoutProvider {
       return (cached = new Erc20PayoutProvider(config.erc20));
     case "webhook":
       return (cached = new WebhookPayoutProvider(config.payoutWebhookUrl, config.payoutWebhookSecret));
-    default:
+    case "manual":
       return (cached = new ManualPayoutProvider());
+    default:
+      return (cached = new XMoneyPayoutProvider());
   }
 }

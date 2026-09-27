@@ -9,6 +9,7 @@ import { getAccount, getStats, listLinkRequests, listPayouts, listTokens, pendin
 import { db, payoutProvider } from "@/lib/server.ts";
 import { Erc20PayoutProvider } from "@/lib/payouts/erc20.ts";
 import { shortAddr, timeAgo } from "@/components/Tables.tsx";
+import { CopyButton } from "@/components/CopyButton.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         </div>
       </div>
       <p className="muted" style={{ fontSize: 13, marginTop: -12 }}>
-        Payouts: <strong>{provider}</strong>
+        Payouts: <strong>{provider === "xmoney" ? "X Money (sent from the queue below)" : provider}</strong>
         {walletInfo ? ` · ${walletInfo}` : ""}
       </p>
 
@@ -319,6 +320,72 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         )}
       </section>
 
+      {config.payoutProvider === "xmoney" ? (
+      <section>
+        <div className="admin-head">
+          <h2>Send on X Money</h2>
+          <span className="muted" style={{ fontSize: 14 }}>
+            {queued.length} to send · {formatUsd(queued.reduce((t, p) => t + p.amount_micros, 0))} total
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: 14 }}>
+          Payouts queue here automatically when an account crosses a milestone. Send each one from {config.appName}&apos;s X Money
+          balance to the @handle in the X app (Wallet → Send), then click Sent. If the account can&apos;t receive X Money, click
+          Can&apos;t pay: the amount goes back to its balance and is sent with the next milestone.
+        </p>
+        {queued.length === 0 ? (
+          <div className="empty">Nothing to send.</div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Send to</th>
+                  <th className="num">Amount</th>
+                  <th>Queued</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {queued.map((p) => (
+                  <tr key={p.id}>
+                    <td className="mono muted">{p.id}</td>
+                    <td>
+                      <div className="inline-copy">
+                        <a href={`https://x.com/${p.handle}`} target="_blank" rel="noreferrer">
+                          <strong>@{p.handle}</strong>
+                        </a>
+                        <CopyButton text={p.handle} label="Copy" />
+                      </div>
+                    </td>
+                    <td className="num">
+                      <div className="inline-copy" style={{ justifyContent: "flex-end" }}>
+                        <strong>{formatUsd(p.amount_micros)}</strong>
+                        <CopyButton text={(p.amount_micros / 1_000_000).toFixed(2)} label="Copy" />
+                      </div>
+                    </td>
+                    <td className="muted">{timeAgo(p.created_at)}</td>
+                    <td>
+                      <form action="/api/admin/action" method="post" className="inline">
+                        <input type="hidden" name="id" value={p.id} />
+                        <input name="ref" placeholder="note (optional)" />
+                        <button className="btn btn-small" type="submit" name="action" value="mark-paid">
+                          Sent
+                        </button>
+                        <button className="btn btn-ghost btn-small" type="submit" name="action" value="mark-failed">
+                          Can&apos;t pay
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      ) : (
       <section>
         <div className="admin-head">
           <h2>Queued payouts</h2>
@@ -398,6 +465,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           </div>
         )}
       </section>
+      )}
 
       <div className="admin-grid">
         <section className="panel">

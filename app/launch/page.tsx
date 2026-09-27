@@ -58,8 +58,14 @@ export default function Launch() {
         </li>
       </ol>
       <p className="muted" style={{ fontSize: 14 }}>
-        The account owner collects payouts by <Link href="/wallet">connecting a wallet</Link>. Anyone named in a bio can opt out;
-        please only name accounts that want the fees.
+        {config.payoutProvider === "xmoney" ? (
+          <>The account owner is paid in dollars through X Money, straight to their @handle. Nothing to connect.</>
+        ) : (
+          <>
+            The account owner collects payouts by <Link href="/wallet">connecting a wallet</Link>.
+          </>
+        )}{" "}
+        Anyone named in a bio can opt out; please only name accounts that want the fees.
       </p>
     </div>
   );

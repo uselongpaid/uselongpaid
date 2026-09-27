@@ -20,6 +20,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
 
   const minMilestone = formatUsd(config.milestones.list[0]);
   const xUrl = config.detect.handle ? `https://x.com/${config.detect.handle}` : null;
+  const viaXMoney = config.payoutProvider === "xmoney";
 
   return (
     <>
@@ -33,15 +34,22 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
           </h1>
           <p className="lede">
             Launch on app.long.xyz, send the fees to {feeHandle} and write <strong>fees @yourhandle</strong> in the bio.{" "}
-            {share}% of the creator fees are paid out to that X account in dollars. The other {100 - share}% buys back and burns.
+            {share}% of the creator fees are paid out to that X account in dollars{viaXMoney ? " through X Money" : ""}. The other{" "}
+            {100 - share}% buys back and burns.
           </p>
           <div className="cta-row">
             <Link className="btn" href="/launch">
               Launch a token
             </Link>
-            <Link className="btn btn-ghost" href="/wallet">
-              Claim your fees
-            </Link>
+            {viaXMoney ? (
+              <Link className="btn btn-ghost" href="/check">
+                Check a token
+              </Link>
+            ) : (
+              <Link className="btn btn-ghost" href="/wallet">
+                Claim your fees
+              </Link>
+            )}
             {xUrl && (
               <a className="btn btn-ghost btn-icon" href={xUrl} target="_blank" rel="noreferrer" aria-label={`${feeHandle} on X`}>
                 <XIcon /> {feeHandle}
@@ -113,11 +121,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
           </div>
           <div className="step">
             <div className="n">03</div>
-            <h3>Paid out in dollars</h3>
-            <p>
-              The first payout goes out at {minMilestone} earned, then at every milestone after that. <Link href="/wallet">Connect a wallet</Link>{" "}
-              and link your X account to receive it.
-            </p>
+            <h3>{viaXMoney ? "Paid through X Money" : "Paid out in dollars"}</h3>
+            {viaXMoney ? (
+              <p>
+                The first payout goes out at {minMilestone} earned, then at every milestone after that, in dollars straight to the
+                X account&apos;s X Money. Nothing to connect.
+              </p>
+            ) : (
+              <p>
+                The first payout goes out at {minMilestone} earned, then at every milestone after that. <Link href="/wallet">Connect a wallet</Link>{" "}
+                and link your X account to receive it.
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -133,7 +148,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
           <div className="split-rows">
             <div>
               <i style={{ background: "var(--accent)" }} />
-              <span>To @alice, paid in dollars</span>
+              <span>To @alice, paid in dollars{viaXMoney ? " via X Money" : ""}</span>
               <strong>${share}</strong>
             </div>
             <div>
@@ -173,13 +188,23 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
             <h3>No double payouts</h3>
             <p>A payout that may already be on its way is held for review, never sent twice.</p>
           </div>
-          <div className="feature">
-            <h3>Your handle, your wallet</h3>
-            <p>Payouts go to a wallet only after it signs and the X account posts a code. Nobody can redirect them.</p>
-          </div>
+          {viaXMoney ? (
+            <div className="feature">
+              <h3>Straight to X Money</h3>
+              <p>Payouts are sent in dollars to the @handle itself, through X Money. No wallet, no bridge, no crypto needed.</p>
+            </div>
+          ) : (
+            <div className="feature">
+              <h3>Your handle, your wallet</h3>
+              <p>Payouts go to a wallet only after it signs and the X account posts a code. Nobody can redirect them.</p>
+            </div>
+          )}
           <div className="feature">
             <h3>No sign-up needed</h3>
-            <p>Named accounts start earning right away. Link a wallet whenever you like; the balance waits for you.</p>
+            <p>
+              Named accounts start earning right away.{" "}
+              {viaXMoney ? "Payouts arrive in X Money on their own." : "Link a wallet whenever you like; the balance waits for you."}
+            </p>
           </div>
           <div className="feature">
             <h3>Opt out anytime</h3>
@@ -208,15 +233,31 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
         <div className="faq">
           <details>
             <summary>Do I need to sign up to earn?</summary>
-            <p>
-              No. If a token&apos;s bio says fees @you and its fees go to {feeHandle}, you&apos;re earning. To receive payouts,{" "}
-              <Link href="/wallet">connect a wallet</Link> and link your X account once.
-            </p>
+            {viaXMoney ? (
+              <p>
+                No. If a token&apos;s bio says fees @you and its fees go to {feeHandle}, you&apos;re earning, and payouts are sent to
+                your @handle through X Money. There&apos;s nothing to connect.
+              </p>
+            ) : (
+              <p>
+                No. If a token&apos;s bio says fees @you and its fees go to {feeHandle}, you&apos;re earning. To receive payouts,{" "}
+                <Link href="/wallet">connect a wallet</Link> and link your X account once.
+              </p>
+            )}
           </details>
           <details>
             <summary>Is my token still a normal long.xyz token?</summary>
             <p>Yes. You launch on app.long.xyz, so it&apos;s listed there and trades like any other long.xyz token.</p>
           </details>
+          {viaXMoney && (
+            <details>
+              <summary>How do I receive X Money?</summary>
+              <p>
+                X Money lives in the X app (Wallet tab). If your account can&apos;t receive it yet, your payout isn&apos;t lost: it
+                goes back to your balance and is sent with your next milestone.
+              </p>
+            </details>
+          )}
           <details>
             <summary>How fast is my token picked up?</summary>
             <p>

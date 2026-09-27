@@ -26,8 +26,8 @@ claim with its transaction hash. From that moment on, everything is automatic:
 - **80%** is credited to the X account, **20%** is set aside to buy back and burn.
 - Every time the account's lifetime earnings cross a milestone — **$5, $10, $20, $50, $100, $250, $500, $1,000**, then every
   **$1,000** — its full unpaid balance is paid out.
-- Payouts go on-chain on **Robinhood Chain** as a USD stablecoin to the wallet the account owner connected and verified.
-  Until they link one, the money waits for them — nothing is lost.
+- Payouts are sent in dollars **through X Money, straight to the @handle**, from LongPaid's pre-funded X Money balance. The
+  recipient doesn't sign up or connect anything.
 
 > LongPaid is an independent project. It is not affiliated with long.xyz, X, or UsePaid.
 
@@ -39,7 +39,8 @@ claim with its transaction hash. From that moment on, everything is automatic:
 - [The money flow in detail](#the-money-flow-in-detail)
 - [Detecting launches on app.long.xyz](#detecting-launches-on-applongxyz)
 - [Payout safety](#payout-safety)
-- [Linking a payout wallet](#linking-a-payout-wallet)
+- [X Money payouts](#x-money-payouts)
+- [Linking a payout wallet (erc20 mode)](#linking-a-payout-wallet-erc20-mode)
 - [Data model](#data-model)
 - [Running it](#running-it)
 - [Operating it](#operating-it)
@@ -213,7 +214,21 @@ It runs every 2 minutes inside the web process (`instrumentation.ts`), from `POS
 `npm run sync-launches`, or **Sync now** in `/admin`. A cursor in the database resumes where it stopped, and log ranges the
 RPC refuses are split in half until they fit.
 
-## Linking a payout wallet
+## X Money payouts
+
+X Money has no public API, so LongPaid does what "paid through X Money from a pre-funded float" means in practice:
+
+1. The money side is automatic: claims are split 80/20, milestones are tracked and a payout is queued the moment an
+   account crosses one.
+2. `/admin` → **Send on X Money** lists each queued payout with the @handle and amount ready to copy. The operator sends it
+   from LongPaid's X Money balance in the X app (Wallet → Send) and clicks **Sent**.
+3. If an account can't receive X Money yet, **Can't pay** returns the amount to its balance; it goes out with the next
+   milestone.
+
+Keep the X Money balance topped up from claimed fees. `PAYOUT_PROVIDER=erc20` (stablecoin to a linked wallet, fully
+automatic) and `webhook` (your own payout service) remain available.
+
+## Linking a payout wallet (erc20 mode)
 
 Anyone can put any @handle in token metadata, so the owner of that handle has to prove it before money moves. There's no
 X login. The flow uses a wallet signature plus a public post:
@@ -333,7 +348,7 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `TREASURY_ADDRESS` | yes | Fee beneficiary shown in the launch guide. |
 | `RECIPIENT_SHARE_BPS` | | Account share in basis points. Default `8000` (80%). |
 | `PAYOUT_MILESTONES_USD`, `PAYOUT_MILESTONE_STEP_USD` | | Milestone schedule. Default `5,10,20,50,100,250,500,1000` and `1000`. |
-| `PAYOUT_PROVIDER` | | `erc20` (default in `.env.example`), `webhook` or `manual`. |
+| `PAYOUT_PROVIDER` | | `xmoney` (default: sent by hand from the X Money queue in `/admin`), `erc20`, `webhook` or `manual`. |
 | `PAYOUT_TOKEN_ADDRESS`, `PAYOUT_TOKEN_DECIMALS` | erc20 | Stablecoin used for payouts, for example USDC with 6 decimals. |
 | `PAYOUT_PRIVATE_KEY` | erc20 | Hot wallet that holds the payout float. **Not** the treasury key. |
 | `PAYOUT_RPC_URL`, `PAYOUT_CHAIN_ID` | | Payout chain, if different from the long.xyz chain. |
