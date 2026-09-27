@@ -9,6 +9,17 @@
 
 import type { PricingHints } from "./launchlab.ts";
 
+export type TokenStats = {
+  priceUsd: number | null;
+  marketCapUsd: number | null;
+  volume24hUsd: number | null;
+  holders: number | null;
+  /** Bonding-curve progress toward graduation, 0–100. */
+  progress: number | null;
+  graduated: boolean | null;
+  quoteSymbol: string | null;
+};
+
 export type Pair = { mint: string; symbol: string; name: string; logo: string | null; category: string | null };
 
 type Fetch = typeof fetch;
@@ -118,6 +129,34 @@ export class StonkfunClient {
     const configId = findString(raw, ["configId", "globalConfig"]);
     if (configId && BASE58.test(configId)) out.configId = configId;
     return out;
+  }
+
+  /** Market numbers stonkfun has for a token, or null when it doesn't list it (yet). */
+  async token(mint: string): Promise<TokenStats | null> {
+    let raw: unknown;
+    try {
+      raw = await this.call(`/tokens/${encodeURIComponent(mint)}`);
+    } catch (e) {
+      if (e instanceof StonkfunError && e.status === 404) return null;
+      throw e;
+    }
+    const n = (keys: string[]): number | null => {
+      const v = findValue(raw, keys);
+      const x = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+      return Number.isFinite(x) ? x : null;
+    };
+    const grad = findValue(raw, ["graduated", "isGraduated", "migrated"]);
+    let progress = n(["bondingCurveProgress", "curveProgress", "progress", "bondingProgress"]);
+    if (progress !== null && progress <= 1) progress *= 100;
+    return {
+      priceUsd: n(["priceUsd", "price_usd", "usdPrice", "price"]),
+      marketCapUsd: n(["marketCapUsd", "marketCap", "market_cap", "mcapUsd", "mcap", "fdv"]),
+      volume24hUsd: n(["volume24hUsd", "volume24h", "volume_24h", "volumeUsd24h", "volume"]),
+      holders: n(["holders", "holderCount", "holdersCount"]),
+      progress: progress === null ? null : Math.max(0, Math.min(100, progress)),
+      graduated: typeof grad === "boolean" ? grad : null,
+      quoteSymbol: findString(raw, ["quoteSymbol", "pairSymbol", "quoteTicker"]),
+    };
   }
 
   /** True once stonkfun lists the token (adopted from LaunchLab). */

@@ -162,3 +162,19 @@ test("StonkfunClient reads pairs, pricing and listing", async () => {
   assert.equal(await c.listed(USDC), true);
   assert.equal(await c.listed("So11111111111111111111111111111111111111112"), false);
 });
+
+test("StonkfunClient.token reads market numbers loosely", async () => {
+  const fake = (async (url: string) =>
+    url.includes("/tokens/missing")
+      ? new Response(JSON.stringify({ error: "not found" }), { status: 404 })
+      : new Response(JSON.stringify({ token: { priceUsd: "0.0000123", marketCap: 12345.6, volume24h: 4321, holders: 57, bondingCurveProgress: 0.37, quoteSymbol: "NVDAx" } }))) as typeof fetch;
+  const c = new StonkfunClient("https://api.test/v1", fake);
+  const t = (await c.token(USDC))!;
+  assert.equal(t.priceUsd, 0.0000123);
+  assert.equal(t.marketCapUsd, 12345.6);
+  assert.equal(t.volume24hUsd, 4321);
+  assert.equal(t.holders, 57);
+  assert.equal(Math.round(t.progress!), 37);
+  assert.equal(t.quoteSymbol, "NVDAx");
+  assert.equal(await c.token("missing"), null);
+});

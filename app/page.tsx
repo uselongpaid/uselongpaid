@@ -9,6 +9,8 @@ import { LiveStats } from "@/components/LiveStats.tsx";
 import { FeesChart } from "@/components/FeesChart.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
 import { FeeFlow } from "@/components/FeeFlow.tsx";
+import { CoinCard } from "@/components/CoinCard.tsx";
+import { listCoins } from "@/lib/coins.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
   const d = db();
   const feeHandle = config.detect.handle ? `@${config.detect.handle}` : config.appName;
   const stats = getStats(d);
+  const coins = listCoins(d, { limit: 6 });
   const share = config.recipientShareBps / 100;
 
   const minMilestone = formatUsd(config.milestones.list[0]);
@@ -139,6 +142,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
           </div>
         </div>
       </section>
+
+      {coins.length > 0 && (
+        <section>
+          <div className="admin-head">
+            <h2>New launches</h2>
+            <Link href="/coins">All coins →</Link>
+          </div>
+          <div className="coin-grid">
+            {coins.map((c) => (
+              <CoinCard key={c.id} c={c} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <h2>Where the fees go</h2>

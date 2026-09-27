@@ -11,5 +11,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const row = db().prepare("SELECT * FROM site_launches WHERE id = ?").get(id) as LaunchRow | undefined;
   if (!row || !row.mint) return NextResponse.json({ error: "not found" }, { status: 404 });
   const image = row.image.startsWith("data:") ? `${publicOrigin(req)}/api/launch/${id}/image` : row.image;
-  return NextResponse.json(metadataJson(row, image), { headers: { "cache-control": "public, max-age=300", "access-control-allow-origin": "*" } });
+  const meta = metadataJson(row, image);
+  // A coin launched here links back to its page on this site unless the creator gave a website.
+  if (!("website" in meta)) Object.assign(meta, { website: `${publicOrigin(req)}/coin/${row.mint}` });
+  return NextResponse.json(meta, { headers: { "cache-control": "public, max-age=300", "access-control-allow-origin": "*" } });
 }

@@ -40,6 +40,8 @@ export const config = {
     url: (process.env.LAUNCHPAD_URL || "https://www.stonkfun.xyz").replace(/\/$/, ""),
     launchUrl: process.env.LAUNCHPAD_LAUNCH_URL || "https://www.stonkfun.xyz/launch",
     network: process.env.NEXT_PUBLIC_CHAIN_NAME || "Solana",
+    /** A coin's page on the launchpad; {mint} is replaced. */
+    tokenUrl: process.env.LAUNCHPAD_TOKEN_URL || "https://www.stonkfun.xyz/token/{mint}",
   },
   /** Solana wallet that receives the creator fees of LongPaid tokens. Shown on /launch when set. */
   feeWallet: process.env.LONGPAID_FEE_WALLET || "",

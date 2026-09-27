@@ -192,9 +192,14 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
           Creator fees from trading go to your wallet ({short(launch.wallet)}).
           {launch.handle ? ` The bio names @${launch.handle}.` : ""}
         </p>
-        <button className="btn btn-ghost" type="button" onClick={() => setLaunch(null)}>
-          Launch another
-        </button>
+        <div className="cta-row">
+          <a className="btn" href={`/coin/${launch.mint}`}>
+            Open coin page
+          </a>
+          <button className="btn btn-ghost" type="button" onClick={() => setLaunch(null)}>
+            Launch another
+          </button>
+        </div>
       </div>
     );
   }

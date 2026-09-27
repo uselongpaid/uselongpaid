@@ -25,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <div className="nav-right">
               <nav className="links">
+                <Link href="/coins">Coins</Link>
                 <Link href="/launch">Launch</Link>
                 <Link href="/check">Check</Link>
                 <Link href="/leaderboard">Leaderboard</Link>
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div className="footer-links">
               <span className="copy-label">Product</span>
+              <Link href="/coins">Coins</Link>
               <Link href="/launch">Launch guide</Link>
               <Link href="/check">Check a token</Link>
               {config.payoutProvider === "erc20" && <Link href="/wallet">Claim your fees</Link>}
