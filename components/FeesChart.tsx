@@ -32,6 +32,9 @@ function label(day: string) {
 /** Single-series bar chart of fees claimed per day, with a hover tooltip per bar. */
 export function FeesChart({ data }: { data: Point[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  if (data.every((d) => d.micros === 0)) {
+    return <div className="empty">No fees claimed in the last {data.length} days yet.</div>;
+  }
   const max = niceMax(Math.max(...data.map((d) => d.micros)));
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;

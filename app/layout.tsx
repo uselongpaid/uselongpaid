@@ -4,6 +4,7 @@ import { config } from "@/lib/config.ts";
 import { Logo } from "@/components/Logo.tsx";
 import { WalletProvider } from "@/components/WalletProvider.tsx";
 import { ConnectButton } from "@/components/ConnectButton.tsx";
+import { XIcon } from "@/components/XIcon.tsx";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,13 +30,46 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/leaderboard">Leaderboard</Link>
                 <Link href="/docs">Docs</Link>
               </nav>
+              {config.detect.handle && (
+                <a className="x-link" href={`https://x.com/${config.detect.handle}`} target="_blank" rel="noreferrer" aria-label={`@${config.detect.handle} on X`}>
+                  <XIcon size={15} />
+                </a>
+              )}
               <ConnectButton />
             </div>
           </div>
         </header>
         <main className="wrap">{children}</main>
         <footer className="site">
-          <div className="wrap">
+          <div className="wrap footer-grid">
+            <div>
+              <Link href="/" className="brand">
+                <Logo size={22} /> {config.appName}
+              </Link>
+              <p className="muted" style={{ marginTop: 10, maxWidth: 360 }}>
+                Launch on long.xyz, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
+                {100 - config.recipientShareBps / 100}% buyback and burn.
+              </p>
+            </div>
+            <div className="footer-links">
+              <span className="copy-label">Product</span>
+              <Link href="/launch">Launch guide</Link>
+              <Link href="/check">Check a token</Link>
+              <Link href="/wallet">Claim your fees</Link>
+              <Link href="/leaderboard">Leaderboard</Link>
+            </div>
+            <div className="footer-links">
+              <span className="copy-label">Resources</span>
+              <Link href="/docs">Docs</Link>
+              <a href="https://app.long.xyz" target="_blank" rel="noreferrer">app.long.xyz</a>
+              {config.detect.handle && (
+                <a href={`https://x.com/${config.detect.handle}`} target="_blank" rel="noreferrer">
+                  X · @{config.detect.handle}
+                </a>
+              )}
+            </div>
+          </div>
+          <div className="wrap footer-note">
             {config.appName} is an independent project. It is not affiliated with long.xyz or X.
           </div>
         </footer>
