@@ -17,3 +17,10 @@ test("handleFromMetadata prefers explicit fields, then the description marker", 
   assert.equal(handleFromMetadata({ description: "fees: @dave" }), "dave");
   assert.equal(handleFromMetadata({ description: "no handle here @eve" }), null);
 });
+
+test("fee handle is found wherever the launchpad put the bio", async () => {
+  const { feeHandleFromMetadata } = await import("../lib/handle.ts");
+  assert.equal(feeHandleFromMetadata({ name: "X", properties: { bio: "gm. fees @natan_benish" } } as never, ["uselongpaid"]), "natan_benish");
+  assert.equal(feeHandleFromMetadata({ extensions: [{ text: "fees: @Alice" }] } as never), "alice");
+  assert.equal(feeHandleFromMetadata({ description: "no handle here" }), null);
+});

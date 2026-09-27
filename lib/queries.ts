@@ -235,6 +235,7 @@ export type DetectedRow = {
   handle: string | null;
   status: "pending" | "registered" | "needs_handle" | "dismissed";
   note: string | null;
+  attempts: number;
   detected_at: number;
 };
 

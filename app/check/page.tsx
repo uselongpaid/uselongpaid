@@ -3,6 +3,7 @@ import { formatUsd } from "@/lib/money.ts";
 import { getDetected, getToken } from "@/lib/queries.ts";
 import { config } from "@/lib/config.ts";
 import { db, feeSource } from "@/lib/server.ts";
+import { resolveDetected } from "@/lib/detect.ts";
 import type { Inspection } from "@/lib/sources/types.ts";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,9 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
       error = (e as Error).message;
     }
   }
+  // A launch we've seen but whose metadata isn't read yet: read it now rather than wait for the next scan.
+  const seen = valid ? getDetected(db(), address) : null;
+  if (seen && (seen.status === "pending" || seen.note === "metadata unreachable")) await resolveDetected(address).catch(() => null);
   const tracked = valid ? getToken(db(), address) : null;
   const detected = valid ? getDetected(db(), address) : null;
   const handle = tracked?.handle ?? detected?.handle ?? inspection?.handle ?? null;
@@ -107,7 +111,9 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
                 tracked ? (
                   <Link href={`/token/${tracked.address}`}>{formatUsd(tracked.fees_micros)} claimed so far</Link>
                 ) : detected?.status === "pending" ? (
-                  "Found; reading its metadata."
+                  `Found, but its metadata couldn't be read yet (try ${detected.attempts ?? 0} of 5). It's retried every few minutes; reload to try now.`
+                ) : detected?.status === "needs_handle" ? (
+                  "Waiting for the team to confirm the handle."
                 ) : (
                   "Not yet."
                 )

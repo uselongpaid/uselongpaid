@@ -116,18 +116,30 @@ export function poolDataIncludes(poolData: Hex, wallets: string[]): string | nul
   return null;
 }
 
-const GATEWAYS = (process.env.IPFS_GATEWAYS || "https://ipfs.io/ipfs/,https://dweb.link/ipfs/")
+const GATEWAYS = (
+  process.env.IPFS_GATEWAYS ||
+  "https://ipfs.io/ipfs/,https://dweb.link/ipfs/,https://gateway.pinata.cloud/ipfs/,https://w3s.link/ipfs/,https://nftstorage.link/ipfs/,https://4everland.io/ipfs/"
+)
   .split(",")
-  .map((g) => g.trim())
+  .map((g) => g.trim().replace(/\/?$/, "/"))
   .filter(Boolean);
 
-/** HTTP URLs to try for a tokenURI (ipfs:// goes through public gateways). */
+const CID = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{50,})(\/.*)?$/;
+
+/**
+ * HTTP URLs to try for a tokenURI. IPFS content (ipfs://…, a bare CID, or any gateway URL with /ipfs/<cid>) is tried
+ * on several public gateways, because a single gateway is often slow or rate-limits servers.
+ */
 export function metadataUrls(uri: string): string[] {
   const u = uri.trim();
-  if (u.startsWith("ipfs://")) {
-    const path = u.slice("ipfs://".length).replace(/^ipfs\//, "");
-    return GATEWAYS.map((g) => g.replace(/\/?$/, "/") + path);
+  let path: string | null = null;
+  if (u.startsWith("ipfs://")) path = u.slice("ipfs://".length).replace(/^ipfs\//, "");
+  else if (CID.test(u)) path = u;
+  else if (/^https?:\/\//.test(u)) {
+    const m = u.match(/\/ipfs\/([^?#]+)/);
+    if (!m) return [u];
+    path = m[1];
+    return [...new Set([u, ...GATEWAYS.map((g) => g + path)])];
   }
-  if (/^https?:\/\//.test(u)) return [u];
-  return [];
+  return path ? GATEWAYS.map((g) => g + path) : [];
 }

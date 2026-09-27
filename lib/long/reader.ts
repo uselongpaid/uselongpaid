@@ -57,13 +57,26 @@ export const fetchMetadata: MetadataFetcher = async (tokenURI) => {
     const body = inline.slice(inline.indexOf(",") + 1);
     return JSON.parse(inline.includes(";base64,") ? Buffer.from(body, "base64").toString("utf8") : decodeURIComponent(body)) as TokenMetadata;
   }
-  for (const url of metadataUrls(inline)) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10_000), headers: { accept: "application/json" } });
-      if (res.ok) return (await res.json()) as TokenMetadata;
-    } catch {
-      // try the next gateway
-    }
+  if (inline.startsWith("{")) return JSON.parse(inline) as TokenMetadata;
+  const urls = metadataUrls(inline);
+  if (!urls.length) return null;
+  // Ask every gateway at once and take the first one that answers with JSON.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    return await Promise.any(
+      urls.map(async (url) => {
+        const res = await fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } });
+        if (!res.ok) throw new Error(`${res.status}`);
+        const meta = JSON.parse(await res.text()) as TokenMetadata;
+        if (!meta || typeof meta !== "object") throw new Error("not JSON");
+        return meta;
+      }),
+    );
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    ctrl.abort();
   }
-  return null;
 };

@@ -72,5 +72,17 @@ export function feeHandleFromMetadata(meta: TokenMetadata, exclude: string[] = [
       if (h) return h;
     }
   }
-  return null;
+  // Launchpads nest the bio differently (properties, extensions, attributes…): look at every text value.
+  const seen = new Set<unknown>();
+  const walk = (v: unknown, depth: number): string | null => {
+    if (typeof v === "string") return feeHandleFromText(v, exclude);
+    if (depth > 4 || !v || typeof v !== "object" || seen.has(v)) return null;
+    seen.add(v);
+    for (const x of Array.isArray(v) ? v : Object.values(v)) {
+      const h = walk(x, depth + 1);
+      if (h) return h;
+    }
+    return null;
+  };
+  return walk(meta, 0);
 }

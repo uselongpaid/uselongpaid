@@ -137,9 +137,23 @@ async function recordIfOurs(db: Db, reader: LaunchReader, l: LaunchedToken, opts
 
 type Pending = { asset: string; name: string; symbol: string; token_uri: string; launched_at: number; launcher: string; attempts: number };
 
-async function resolvePending(db: Db, fetchMeta: MetadataFetcher, opts: SyncOptions, report: SyncReport) {
+/** Reads one detected launch's metadata right away (the checker calls this) instead of waiting for the next scan. */
+export async function resolveAsset(db: Db, fetchMeta: MetadataFetcher, opts: SyncOptions, asset: string): Promise<SyncReport> {
+  const report: SyncReport = { from: "0", to: "0", scanned: 0, routedToUs: 0, registered: [], needsHandle: [], caughtUp: true, errors: [] };
+  const a = asset.toLowerCase();
+  // Give a launch whose metadata was unreachable another round of attempts.
+  db.prepare("UPDATE detected_launches SET status = 'pending', attempts = 0, note = NULL WHERE asset = ? AND status = 'needs_handle' AND note = 'metadata unreachable'").run(a);
+  await resolvePending(db, fetchMeta, opts, report, a);
+  return report;
+}
+
+async function resolvePending(db: Db, fetchMeta: MetadataFetcher, opts: SyncOptions, report: SyncReport, only?: string) {
   const maxAttempts = opts.maxMetadataAttempts ?? 5;
-  const rows = db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' ORDER BY block LIMIT 100").all() as Pending[];
+  const rows = (
+    only
+      ? db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' AND asset = ?").all(only)
+      : db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' ORDER BY block LIMIT 100").all()
+  ) as Pending[];
   for (const r of rows) {
     let meta: TokenMetadata | null = null;
     try {

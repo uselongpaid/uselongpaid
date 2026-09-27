@@ -151,3 +151,15 @@ test("the cursor advances, reruns don't duplicate, and oversized ranges are spli
   assert.equal(r2.registered.length, 0);
   assert.equal(listDetected(db).length, 1);
 });
+
+test("metadata URLs try several IPFS gateways for any IPFS form", async () => {
+  const { metadataUrls } = await import("../lib/long/factory.ts");
+  const cid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+  for (const u of [`ipfs://${cid}`, cid, `https://example.mypinata.cloud/ipfs/${cid}`]) {
+    const urls = metadataUrls(u);
+    assert.ok(urls.length >= 3, u);
+    assert.ok(urls.every((x) => x.includes(cid)));
+  }
+  assert.equal(metadataUrls(`https://example.mypinata.cloud/ipfs/${cid}`)[0], `https://example.mypinata.cloud/ipfs/${cid}`);
+  assert.deepEqual(metadataUrls("https://api.example.com/meta/1.json"), ["https://api.example.com/meta/1.json"]);
+});
