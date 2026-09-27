@@ -4,6 +4,7 @@ import { config } from "@/lib/config.ts";
 import { Logo } from "@/components/Logo.tsx";
 import { WalletProvider } from "@/components/WalletProvider.tsx";
 import { ConnectButton } from "@/components/ConnectButton.tsx";
+import { SolanaConnectButton, SolanaWalletProvider } from "@/components/SolanaWallet.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
 import "./globals.css";
 
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <WalletProvider>
+        <SolanaWalletProvider>
         <header className="site">
           <div className="wrap">
             <Link href="/" className="brand">
@@ -36,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <XIcon size={15} />
                 </a>
               )}
-              {config.payoutProvider === "erc20" && <ConnectButton />}
+              {config.payoutProvider === "erc20" ? <ConnectButton /> : config.launch.enabled && <SolanaConnectButton />}
             </div>
           </div>
         </header>
@@ -75,6 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {config.appName} is an independent project. It is not affiliated with {config.launchpad.name} or X.
           </div>
         </footer>
+        </SolanaWalletProvider>
         </WalletProvider>
       </body>
     </html>

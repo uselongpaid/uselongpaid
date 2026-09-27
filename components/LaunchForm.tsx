@@ -2,17 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
+import { useSolanaWallet } from "./SolanaWallet.tsx";
 
 // Launch a stonkfun.xyz coin from this site. The server builds a Raydium LaunchLab launch under StonkFun's platform
 // config; the connected wallet signs and pays it and is the creator. stonkfun lists it a minute or two later.
-
-type SolanaProvider = {
-  isConnected?: boolean;
-  publicKey?: { toBase58(): string } | null;
-  connect(): Promise<{ publicKey: { toBase58(): string } }>;
-  disconnect?(): Promise<void>;
-  signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
-};
 
 type Pair = { mint: string; symbol: string; name: string; logo: string | null; category: string | null };
 
@@ -27,24 +20,6 @@ type Launch = {
   listed: boolean;
   error: string | null;
 };
-
-declare global {
-  interface Window {
-    phantom?: { solana?: SolanaProvider };
-    solflare?: SolanaProvider;
-    backpack?: SolanaProvider;
-    solana?: SolanaProvider;
-  }
-}
-
-function findProviders(): { name: string; p: SolanaProvider }[] {
-  const out: { name: string; p: SolanaProvider }[] = [];
-  if (window.phantom?.solana) out.push({ name: "Phantom", p: window.phantom.solana });
-  if (window.solflare) out.push({ name: "Solflare", p: window.solflare });
-  if (window.backpack) out.push({ name: "Backpack", p: window.backpack });
-  if (!out.length && window.solana) out.push({ name: "Wallet", p: window.solana });
-  return out;
-}
 
 function fromBase64(s: string): Uint8Array {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -72,9 +47,8 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: string; explorerUrl: string; ownHandle: string }) {
-  const [provider, setProvider] = useState<{ name: string; p: SolanaProvider } | null>(null);
-  const [wallet, setWallet] = useState<string | null>(null);
-  const [available, setAvailable] = useState<{ name: string; p: SolanaProvider }[]>([]);
+  const sw = useSolanaWallet();
+  const wallet = sw.address;
   const [pairs, setPairs] = useState<Pair[] | null>(null);
   const [pairsError, setPairsError] = useState<string | null>(null);
   const [image, setImage] = useState("");
@@ -85,22 +59,10 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
   const polling = useRef(false);
 
   useEffect(() => {
-    setAvailable(findProviders());
     api<{ pairs: Pair[] }>("/api/launch/pairs")
       .then((r) => setPairs(r.pairs))
       .catch((e: Error) => setPairsError(e.message));
   }, []);
-
-  async function connect(choice: { name: string; p: SolanaProvider }) {
-    setError(null);
-    try {
-      const r = await choice.p.connect();
-      setProvider(choice);
-      setWallet(r.publicKey.toBase58());
-    } catch (e) {
-      setError((e as Error).message || "The wallet didn't connect.");
-    }
-  }
 
   function onFile(f: File | undefined) {
     if (!f) return;
@@ -130,7 +92,11 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
 
   async function submit(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
-    if (!provider || !wallet) return setError("Connect a wallet first.");
+    const provider = sw.provider;
+    if (!provider || !wallet) {
+      sw.setMenuOpen(true);
+      return setError("Connect a wallet first (top right).");
+    }
     const f = new FormData(ev.currentTarget);
     const get = (k: string) => String(f.get(k) ?? "").trim();
     setBusy(true);
@@ -150,8 +116,8 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
         website: get("website"),
         telegram: get("telegram"),
       });
-      setStep(`Approve in ${provider.name}. Your wallet shows the exact cost.`);
-      const signed = await provider.p.signTransaction(decode(prepared.transaction));
+      setStep(`Approve in ${sw.walletName ?? "your wallet"}. It shows the exact cost.`);
+      const signed = await provider.signTransaction(decode(prepared.transaction));
       const bytes = signed instanceof VersionedTransaction ? signed.serialize() : signed.serialize({ requireAllSignatures: false });
       setStep("Sending to Solana…");
       const l = await api<Launch>("/api/launch/submit", { id: prepared.id, signedTransaction: toBase64(bytes) });
@@ -208,20 +174,17 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
     <form className="panel stack launch-form" onSubmit={submit}>
       <div className="launch-wallet">
         {wallet ? (
-          <span className="pill">
-            <span className="dot" /> {provider?.name} · {short(wallet)}
-          </span>
-        ) : available.length ? (
-          available.map((w) => (
-            <button key={w.name} type="button" className="btn btn-small" onClick={() => connect(w)}>
-              Connect {w.name}
-            </button>
-          ))
-        ) : (
           <span className="muted">
-            No Solana wallet found. Install <a href="https://phantom.com" target="_blank" rel="noreferrer">Phantom</a> or{" "}
-            <a href="https://solflare.com" target="_blank" rel="noreferrer">Solflare</a>, or open this page in your wallet&apos;s browser.
+            Launching as <span className="mono" style={{ color: "var(--text)" }}>{short(wallet)}</span> ({sw.walletName}). Change or disconnect
+            it from the wallet button at the top.
           </span>
+        ) : (
+          <>
+            <button type="button" className="btn btn-small" onClick={() => sw.setMenuOpen(true)}>
+              Connect wallet
+            </button>
+            <span className="muted">Phantom, Solflare or Backpack. You can also use the button at the top.</span>
+          </>
         )}
       </div>
 
