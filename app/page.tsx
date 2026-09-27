@@ -9,6 +9,8 @@ import { LiveStats } from "@/components/LiveStats.tsx";
 import { FeesChart } from "@/components/FeesChart.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
 import { FeeFlow } from "@/components/FeeFlow.tsx";
+import { ProjectCoin } from "@/components/ProjectCoin.tsx";
+import { marketWithin } from "@/lib/marketData.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
   const d = db();
   const feeHandle = config.detect.handle ? `@${config.detect.handle}` : config.appName;
   const stats = getStats(d);
+  const projectMarket = config.projectCoin.address ? await marketWithin(config.projectCoin.address) : null;
   const share = config.recipientShareBps / 100;
 
   const minMilestone = formatUsd(config.milestones.list[0]);
@@ -103,6 +106,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
       </div>
 
       <LiveStats initial={stats} />
+
+      {config.projectCoin.address && (
+        <ProjectCoin
+          address={config.projectCoin.address}
+          fallbackSymbol={config.projectCoin.symbol}
+          initial={projectMarket}
+          buyUrl={config.projectCoin.buyUrl}
+          buyLabel="Buy on long.xyz"
+          explorerUrl={config.chain.explorerUrl}
+        />
+      )}
 
       <section>
         <h2>How it works</h2>

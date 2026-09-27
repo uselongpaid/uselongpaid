@@ -35,6 +35,13 @@ claim with its transaction hash. From that moment on, everything is automatic:
 
 > LongPaid is an independent project. It is not affiliated with long.xyz, X, or UsePaid.
 
+## The LongPaid coin
+
+CA **`0x0a800872db268498e94fd80fdaea318552d31e18`** (Robinhood Chain). The home page and `/coin/:address` show its price,
+24h change, market cap, volume, liquidity and trades, refreshed every 10 seconds, with a live chart. Data comes from
+DEX Screener, then GeckoTerminal ([`lib/marketData.ts`](lib/marketData.ts)); name and symbol fall back to the token
+contract. Set `PROJECT_COIN_ADDRESS` to change it.
+
 ## Contents
 
 - [How it works](#how-it-works)

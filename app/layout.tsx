@@ -50,6 +50,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Launch on long.xyz, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
                 {100 - config.recipientShareBps / 100}% buyback and burn.
               </p>
+              {config.projectCoin.address && (
+                <p className="footer-ca">
+                  <span className="copy-label">CA</span>{" "}
+                  <a className="mono" href="/#coin">
+                    {config.projectCoin.address}
+                  </a>
+                </p>
+              )}
             </div>
             <div className="footer-links">
               <span className="copy-label">Product</span>
