@@ -307,3 +307,9 @@ form.inline input { min-width: 0; flex: 1; font-size: 13px; }
 .ffl-burn .ffl-icon { border-color: var(--burn); color: var(--burn); }
 .ffl-burn .ffl-pct { color: var(--burn); }
 @media (max-width: 700px) { .feeflow-svg { display: none; } .feeflow-list { display: block; } }
+
+/* Launch form */
+.launch-form textarea{width:100%;resize:vertical;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px}
+.launch-wallet{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.launch-logo{width:72px;height:72px;border-radius:16px;object-fit:cover;border:1px solid var(--border)}
+.launch-done code{word-break:break-all}

@@ -93,6 +93,26 @@ CREATE TABLE IF NOT EXISTS detected_launches (
 );
 CREATE INDEX IF NOT EXISTS detected_launches_status ON detected_launches(status);
 
+-- Launches started on this site. The user's wallet is the stonkfun creator and signs its own payment; the server only
+-- relays the prepared and signed transactions to stonkfun's API.
+CREATE TABLE IF NOT EXISTS launch_requests (
+  id             TEXT PRIMARY KEY,
+  wallet         TEXT NOT NULL,
+  handle         TEXT,
+  name           TEXT NOT NULL,
+  symbol         TEXT NOT NULL,
+  quote_mint     TEXT NOT NULL,
+  cost_lamports  INTEGER NOT NULL,
+  prepared       TEXT NOT NULL,
+  status         TEXT NOT NULL CHECK (status IN ('prepared','submitted','completed','failed')),
+  launch_sig     TEXT UNIQUE,
+  mint           TEXT,
+  error          TEXT,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS launch_requests_status ON launch_requests(status);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 

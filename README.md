@@ -40,6 +40,7 @@ automatic:
 - [The money flow in detail](#the-money-flow-in-detail)
 - [Optional: detecting launches on app.long.xyz](#optional-detecting-launches-on-applongxyz)
 - [Payout safety](#payout-safety)
+- [Launching from the site](#launching-from-the-site)
 - [X Money payouts](#x-money-payouts)
 - [Linking a payout wallet (erc20 mode)](#linking-a-payout-wallet-erc20-mode)
 - [Data model](#data-model)
@@ -215,6 +216,26 @@ launches signed by long.xyz's backend. Creators launch on app.long.xyz, and Long
 It runs every 2 minutes inside the web process (`instrumentation.ts`), from `POST /api/cron/sync-launches`,
 `npm run sync-launches`, or **Sync now** in `/admin`. A cursor in the database resumes where it stopped, and log ranges the
 RPC refuses are split in half until they fit.
+
+## Launching from the site
+
+`/launch` has a form that launches a coin on stonkfun.xyz through its public Developer API
+([`lib/stonkfun.ts`](lib/stonkfun.ts), [`lib/launcher.ts`](lib/launcher.ts)). It is non-custodial: the server never holds a
+key or funds.
+
+1. The browser connects Phantom, Solflare or Backpack and sends the form to `POST /api/launch/prepare`.
+2. The server validates it (bio gets `fees @handle` when a handle is given) and calls stonkfun's `POST /launches/prepare`
+   for the user's wallet. It checks the returned payment transaction is paid by that wallet and records its cost.
+3. The wallet signs that transaction. `POST /api/launch/submit` accepts it only if its message is byte-for-byte the one that
+   was prepared and it carries the wallet's signature, then relays it to stonkfun's `POST /launches/submit`.
+4. The page polls `GET /api/launch/:id`, which asks stonkfun's `GET /launches/{paymentSignature}` until the mint is live.
+
+The user pays stonkfun's own launch fee; nothing is added. The launching wallet is the stonkfun creator, so its creator fees
+go to that wallet. To route fees to an X account through LongPaid's 80/20 split, launch with the fees going to
+`LONGPAID_FEE_WALLET` as described on the same page.
+
+stonkfun's request field names come from its public docs; they are all in `lib/stonkfun.ts`, and stonkfun's own error
+messages are shown on the form unchanged. Set `LAUNCH_ON_SITE=0` to hide the form.
 
 ## X Money payouts
 

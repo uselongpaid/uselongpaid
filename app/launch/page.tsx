@@ -3,6 +3,7 @@ import { config } from "@/lib/config.ts";
 import { formatUsd } from "@/lib/money.ts";
 import { CopyButton } from "@/components/CopyButton.tsx";
 import { BioBuilder } from "@/components/BioBuilder.tsx";
+import { LaunchForm } from "@/components/LaunchForm.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,21 @@ export default function Launch() {
         normal {lp.name} token: listed there and everywhere {lp.network} tokens show up.
       </p>
 
+      {config.launch.enabled && (
+        <>
+          <h2>Launch from here</h2>
+          <p className="muted">
+            Fill in your coin, connect a Solana wallet and approve. It launches on {lp.name} with your wallet as the creator:
+            you pay {lp.name}&apos;s own launch fee, and the creator fees go to your wallet.
+          </p>
+          <LaunchForm launchpad={lp.name} explorerUrl={config.chain.explorerUrl} ownHandle={handle} />
+          <h2 style={{ marginTop: 48 }}>Or route the fees to an X account</h2>
+          <p className="muted">
+            To have {config.appName} pay {share}% of the creator fees to an X account and burn {100 - share}%, launch on {lp.name} with
+            the fees going to the {config.appName} wallet:
+          </p>
+        </>
+      )}
       <ol className="guide">
         <li>
           <h3>Start a launch on {lp.name}</h3>

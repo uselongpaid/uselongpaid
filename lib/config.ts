@@ -45,6 +45,11 @@ export const config = {
   feeWallet: process.env.LONGPAID_FEE_WALLET || "",
   /** Solana JSON-RPC used to confirm claim transactions and read token names. */
   solanaRpcUrl: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
+  /** Launching on stonkfun.xyz from this site: the user's own wallet signs; the server only relays to stonkfun's API. */
+  launch: {
+    enabled: process.env.LAUNCH_ON_SITE !== "0",
+    apiBase: process.env.STONKFUN_API_URL || "https://www.stonkfun.xyz/api/public/v1",
+  },
   explorerTokenUrl: process.env.EXPLORER_TOKEN_URL || `${chain.explorerUrl}/token/{address}`,
   /** Optional: scanning long.xyz (Robinhood Chain) launches. Off unless LONGPAID_FEE_WALLETS is set. */
   detect: {
