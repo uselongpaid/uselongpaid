@@ -5,7 +5,7 @@ import { ViemLaunchReader, fetchMetadata } from "../lib/long/reader.ts";
 import { syncLaunches } from "../lib/long/sync.ts";
 
 if (!config.detect.feeWallets.length) {
-  console.error("Set LONGPAID_FEE_WALLETS (or TREASURY_ADDRESS) to the wallet long.xyz pays LongPaid's fees to.");
+  console.error("Set LONGPAID_FEE_WALLETS to the wallet long.xyz pays LongPaid's fees to.");
   process.exit(1);
 }
 const report = await syncLaunches(openDb(config.databasePath), new ViemLaunchReader(config.long.rpcUrl, config.detect.factory), fetchMetadata, {

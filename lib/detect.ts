@@ -12,7 +12,7 @@ export function detectionEnabled(): boolean {
 
 /** One scan of long.xyz's factory. Concurrent callers share the run in progress. */
 export function runLaunchSync(): Promise<SyncReport> {
-  if (!detectionEnabled()) return Promise.reject(new Error("set LONGPAID_FEE_WALLETS (or TREASURY_ADDRESS) first"));
+  if (!detectionEnabled()) return Promise.reject(new Error("set LONGPAID_FEE_WALLETS first"));
   running ??= syncLaunches(db(), new ViemLaunchReader(config.long.rpcUrl, config.detect.factory), fetchMetadata, {
     feeWallets: config.detect.feeWallets,
     excludeHandles: config.detect.handle ? [config.detect.handle] : [],

@@ -37,9 +37,10 @@ export const config = {
   detect: {
     factory: process.env.LONG_FACTORY_ADDRESS || "0x1Eef016F22A943abC7DD11422EDeE9D235942104",
     /** LongPaid's X account: what creators type as fee receiver on app.long.xyz. */
-    handle: (process.env.LONGPAID_X_HANDLE || "").replace(/^@/, "").toLowerCase(),
+    handle: (process.env.LONGPAID_X_HANDLE || "uselongpaid").replace(/^@/, "").toLowerCase(),
     /** Wallet(s) long.xyz pays LongPaid's fees to (the long.xyz wallet of that X account). */
-    feeWallets: (process.env.LONGPAID_FEE_WALLETS || process.env.TREASURY_ADDRESS || "")
+    // Default: the app.long.xyz wallet of @uselongpaid.
+    feeWallets: (process.env.LONGPAID_FEE_WALLETS || "0x13A05697e39F0a2b3638154a1cF85e59d85A05d3")
       .split(",")
       .map((w) => w.trim())
       .filter((w) => /^0x[0-9a-fA-F]{40}$/.test(w)),
