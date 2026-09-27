@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatUsd } from "@/lib/money.ts";
-import { isTokenAddress } from "@/lib/address.ts";
 import { getToken, recentClaims, tokenTotals } from "@/lib/queries.ts";
 import { db } from "@/lib/server.ts";
 import { ClaimsTable } from "@/components/Tables.tsx";
@@ -10,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Token({ params }: { params: Promise<{ address: string }> }) {
   const { address } = await params;
-  if (!isTokenAddress(address)) notFound();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) notFound();
   const d = db();
   const token = getToken(d, address);
 

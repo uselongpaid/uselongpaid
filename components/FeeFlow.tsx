@@ -54,19 +54,19 @@ function Icon({ name }: { name: IconName }) {
 
 type Node = { x: number; y: number; icon: IconName; label: string[]; tone?: "burn" | "hot" };
 
-export function FeeFlow({ share, handle, launchpad, network }: { share: number; handle: string; launchpad: string; network: string }) {
+export function FeeFlow({ share, handle }: { share: number; handle: string }) {
   const burn = 100 - share;
   const nodes: Node[] = [
-    { x: 80, y: 180, icon: "chart", label: [`${launchpad} on`, network] },
+    { x: 80, y: 180, icon: "chart", label: ["long.xyz on", "Robinhood Chain"] },
     { x: 290, y: 180, icon: "claim", label: ["Fees", "claimed"] },
-    { x: 510, y: 90, icon: "dollar", label: ["Converted", "to dollars"], tone: "hot" },
+    { x: 510, y: 90, icon: "dollar", label: ["Offramp through", "Robinhood"], tone: "hot" },
     { x: 750, y: 90, icon: "wallet", label: ["Sent to X Money", `balance @${handle}`] },
     { x: 990, y: 90, icon: "user", label: ["Sent to", "X user"] },
     { x: 510, y: 280, icon: "flame", label: ["Bought back", "and burned"], tone: "burn" },
   ];
   return (
     <div className="feeflow">
-      <svg className="feeflow-svg" viewBox="0 0 1080 360" role="img" aria-label={`Fees claimed from ${launchpad} on ${network}: ${share}% converted to dollars and sent through X Money to the handle in the bio, ${burn}% bought back and burned.`}>
+      <svg className="feeflow-svg" viewBox="0 0 1080 360" role="img" aria-label={`Fees claimed from long.xyz on Robinhood Chain: ${share}% offramped through Robinhood and sent through X Money to the handle in the bio, ${burn}% bought back and burned.`}>
         <g className="ff-lines">
           <path d="M112 180H258" />
           <path d="M322 180C400 180 400 90 478 90" className="ff-main" />
@@ -106,7 +106,7 @@ export function FeeFlow({ share, handle, launchpad, network }: { share: number; 
           <span className="ffl-icon">
             <svg viewBox="0 0 24 24" width="20" height="20"><Icon name="chart" /></svg>
           </span>
-          {launchpad} on {network}
+          long.xyz on Robinhood Chain
         </li>
         <li>
           <span className="ffl-icon">
@@ -119,7 +119,7 @@ export function FeeFlow({ share, handle, launchpad, network }: { share: number; 
           <span className="ffl-icon">
             <svg viewBox="0 0 24 24" width="20" height="20"><Icon name="dollar" /></svg>
           </span>
-          Converted to dollars → X Money balance @{handle} → sent to the X user
+          Offramp through Robinhood → X Money balance @{handle} → sent to the X user
         </li>
         <li className="ffl-branch ffl-burn">
           <span className="ffl-pct">{burn}%</span>

@@ -3,60 +3,42 @@ import { config } from "@/lib/config.ts";
 import { formatUsd } from "@/lib/money.ts";
 import { CopyButton } from "@/components/CopyButton.tsx";
 import { BioBuilder } from "@/components/BioBuilder.tsx";
-import { LaunchForm } from "@/components/LaunchForm.tsx";
 
 export const dynamic = "force-dynamic";
 
 export default function Launch() {
   const share = config.recipientShareBps / 100;
   const handle = config.detect.handle;
-  const lp = config.launchpad;
+  const minutes = Math.max(1, Math.round(config.detect.intervalMs / 60_000));
   return (
     <div className="docs">
-      <h1>Launch on {lp.name}, pay any X account</h1>
+      <h1>Launch on long.xyz, pay any X account</h1>
       <p className="muted">
-        You launch on {lp.name} as usual, on {lp.network}. Two things tell {config.appName} where the fees go. Your token is a
-        normal {lp.name} token: listed there and everywhere {lp.network} tokens show up.
+        You launch on app.long.xyz as usual. Two fields tell {config.appName} where the fees go. Your token is a normal long.xyz
+        token: listed on app.long.xyz and everywhere long.xyz tokens show up.
       </p>
 
-      {config.launch.enabled && (
-        <>
-          <h2>Launch from here</h2>
-          <p className="muted">
-            Fill in your coin, connect a Solana wallet and approve. It launches on {lp.name} with your wallet as the creator:
-            you pay {lp.name}&apos;s own launch fee, and the creator fees go to your wallet.
-          </p>
-          <LaunchForm launchpad={lp.name} explorerUrl={config.chain.explorerUrl} ownHandle={handle} />
-          <h2 style={{ marginTop: 48 }}>Or route the fees to an X account</h2>
-          <p className="muted">
-            To have {config.appName} pay {share}% of the creator fees to an X account and burn {100 - share}%, launch on {lp.name} with
-            the fees going to the {config.appName} wallet:
-          </p>
-        </>
-      )}
       <ol className="guide">
         <li>
-          <h3>Start a launch on {lp.name}</h3>
+          <h3>Start a launch on app.long.xyz</h3>
           <p>
             Open{" "}
-            <a href={lp.launchUrl} target="_blank" rel="noreferrer">
-              {lp.name}
+            <a href="https://app.long.xyz" target="_blank" rel="noreferrer">
+              app.long.xyz
             </a>
             , create a token, and fill in the name, ticker, image and pair as usual.
           </p>
         </li>
         <li>
-          <h3>Send the creator fees to {config.appName}</h3>
-          {config.feeWallet ? (
-            <>
-              <p>Use the {config.appName} wallet as the creator fee wallet:</p>
-              <div className="copy-row">
-                <code>{config.feeWallet}</code>
-                <CopyButton text={config.feeWallet} />
-              </div>
-            </>
+          <h3>Send the fees to {config.appName}</h3>
+          <p>In the fee receiver field, enter:</p>
+          {handle ? (
+            <div className="copy-row">
+              <code>@{handle}</code>
+              <CopyButton text={`@${handle}`} />
+            </div>
           ) : (
-            <p className="notice">The operator hasn&apos;t set {config.appName}&apos;s {lp.network} wallet yet (LONGPAID_FEE_WALLET).</p>
+            <p className="notice">The operator hasn&apos;t set {config.appName}&apos;s X account yet (LONGPAID_X_HANDLE).</p>
           )}
           <p className="muted">
             {config.appName} holds the fees for the account in step 3: {share}% goes to them, {100 - share}% buys back and burns.
@@ -67,12 +49,11 @@ export default function Launch() {
           <BioBuilder ownHandle={handle} />
         </li>
         <li>
-          <h3>Launch and tag {handle ? `@${handle}` : config.appName}</h3>
+          <h3>Launch</h3>
           <p>
-            Post the token address on X and tag {handle ? `@${handle}` : config.appName}. The team checks on-chain that the fees
-            reach {config.appName} and adds the token. Check it any time with the <Link href="/check">eligibility checker</Link>.
-            From then on {share}% of its creator fees are credited to the account, and payouts start once it has earned{" "}
-            {formatUsd(config.milestones.list[0])}.
+            {config.appName} picks the token up on its own within about {minutes} min. Check it with the{" "}
+            <Link href="/check">eligibility checker</Link>. From then on {share}% of its creator fees are credited to the account, and
+            payouts start once it has earned {formatUsd(config.milestones.list[0])}.
           </p>
         </li>
       </ol>

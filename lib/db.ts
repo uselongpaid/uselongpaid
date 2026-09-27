@@ -93,30 +93,6 @@ CREATE TABLE IF NOT EXISTS detected_launches (
 );
 CREATE INDEX IF NOT EXISTS detected_launches_status ON detected_launches(status);
 
--- Launches started on this site, built on Raydium LaunchLab under StonkFun's platform config. The user's wallet pays,
--- signs and is the creator; the server builds the transaction, relays it, and serves the token metadata.
-CREATE TABLE IF NOT EXISTS site_launches (
-  id           TEXT PRIMARY KEY,
-  wallet       TEXT NOT NULL,
-  handle       TEXT,
-  name         TEXT NOT NULL,
-  symbol       TEXT NOT NULL,
-  description  TEXT NOT NULL,
-  image        TEXT NOT NULL,
-  socials      TEXT NOT NULL DEFAULT '{}',
-  quote_mint   TEXT NOT NULL,
-  mint         TEXT,
-  pool         TEXT,
-  tx           TEXT,
-  status       TEXT NOT NULL CHECK (status IN ('building','prepared','submitted','completed','failed')),
-  signature    TEXT UNIQUE,
-  listed       INTEGER NOT NULL DEFAULT 0,
-  error        TEXT,
-  created_at   INTEGER NOT NULL,
-  updated_at   INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS site_launches_status ON site_launches(status);
-
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 

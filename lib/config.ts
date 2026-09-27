@@ -34,38 +34,14 @@ export const config = {
   payoutWebhookSecret: process.env.PAYOUT_WEBHOOK_SECRET || "",
   appUrl: (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, ""),
   sessionSecret: process.env.SESSION_SECRET || "",
-  /** Where tokens are launched. Only shapes links and copy; claims are recorded by hand in /admin. */
-  launchpad: {
-    name: process.env.LAUNCHPAD_NAME || "stonkfun.xyz",
-    url: (process.env.LAUNCHPAD_URL || "https://www.stonkfun.xyz").replace(/\/$/, ""),
-    launchUrl: process.env.LAUNCHPAD_LAUNCH_URL || "https://www.stonkfun.xyz/launch",
-    network: process.env.NEXT_PUBLIC_CHAIN_NAME || "Solana",
-    /** A coin's page on the launchpad; {mint} is replaced. */
-    tokenUrl: process.env.LAUNCHPAD_TOKEN_URL || "https://www.stonkfun.xyz/token/{mint}",
-  },
-  /** LongPaid's own coin, shown with a live chart on the home page and its CA in the footer. Empty hides it. */
-  projectCoin: {
-    mint: (process.env.PROJECT_COIN_MINT ?? "AbyFpbzShnHTho4U8XzPiGRoqUeQiZLhoQeakw43uSZw").trim(),
-    /** Shown until DEX Screener returns the real ticker. */
-    symbol: (process.env.PROJECT_COIN_SYMBOL || "").replace(/^\$/, ""),
-  },
-  /** Solana wallet that receives the creator fees of LongPaid tokens. Shown on /launch when set. */
-  feeWallet: process.env.LONGPAID_FEE_WALLET || "",
-  /** Solana JSON-RPC used to confirm claim transactions and read token names. */
-  solanaRpcUrl: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
-  /** Launching on stonkfun.xyz from this site: the user's own wallet signs; the server only relays to stonkfun's API. */
-  launch: {
-    enabled: process.env.LAUNCH_ON_SITE !== "0",
-    apiBase: process.env.STONKFUN_API_URL || "https://www.stonkfun.xyz/api/public/v1",
-  },
-  explorerTokenUrl: process.env.EXPLORER_TOKEN_URL || `${chain.explorerUrl}/token/{address}`,
-  /** Optional: scanning long.xyz (Robinhood Chain) launches. Off unless LONGPAID_FEE_WALLETS is set. */
+  /** Detecting launches on app.long.xyz that send their fees to LongPaid. */
   detect: {
     factory: process.env.LONG_FACTORY_ADDRESS || "0x1Eef016F22A943abC7DD11422EDeE9D235942104",
     /** LongPaid's X account: what creators type as fee receiver on app.long.xyz. */
     handle: (process.env.LONGPAID_X_HANDLE || "uselongpaid").replace(/^@/, "").toLowerCase(),
     /** Wallet(s) long.xyz pays LongPaid's fees to (the long.xyz wallet of that X account). */
-    feeWallets: (process.env.LONGPAID_FEE_WALLETS || "")
+    // Default: the app.long.xyz wallet of @uselongpaid.
+    feeWallets: (process.env.LONGPAID_FEE_WALLETS || "0x13A05697e39F0a2b3638154a1cF85e59d85A05d3")
       .split(",")
       .map((w) => w.trim())
       .filter((w) => /^0x[0-9a-fA-F]{40}$/.test(w)),

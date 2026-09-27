@@ -8,38 +8,32 @@ export default function Docs() {
   return (
     <div className="docs">
       <h1>Docs</h1>
-      <p className="muted">
-        How {config.appName} routes {config.launchpad.name} creator fees to X accounts.
-      </p>
+      <p className="muted">How {config.appName} routes long.xyz creator fees to X accounts.</p>
 
       <h2 id="overview">Overview</h2>
       <p>
-        Tokens launched on {config.launchpad.name} ({config.launchpad.network}) earn creator fees from trading. When a token sends
-        its creator fees to the {config.appName} wallet, we claim them and credit them to the X account in the token&apos;s bio.
-        The account owner doesn&apos;t need a wallet or a sign-up.
+        Tokens launched on long.xyz earn creator fees from trading. When a token names the {config.appName} treasury as its
+        creator-fee beneficiary, we claim those fees on-chain and credit them to the X account in the token's metadata. The
+        account owner doesn't need a wallet or a sign-up.
       </p>
 
       <h2 id="launch">Launching a token</h2>
       <ol>
         <li>
-          Create the token on <a href={config.launchpad.launchUrl}>{config.launchpad.name}</a> as usual.
+          Create the token on <a href="https://app.long.xyz">app.long.xyz</a> as usual.
         </li>
         <li>
-          Send its creator fees to the {config.appName} wallet
-          {config.feeWallet ? (
-            <>
-              : <code>{config.feeWallet}</code>
-            </>
-          ) : null}
-          .
+          Set the fee receiver to <code>@{config.detect.handle || "longpaid"}</code>. long.xyz then pays the creator fees to{" "}
+          {config.appName}.
         </li>
         <li>
           Write who earns them in the token bio: <code>fees @alice</code>. <code>fees to @alice</code>,{" "}
           <code>fee send @alice</code> and <code>fees: @alice</code> work too.
         </li>
         <li>
-          Launch, then post the token address and tag <code>@{config.detect.handle || "uselongpaid"}</code> on X. The team checks
-          on-chain that the fees really reach {config.appName} and adds the token; the bio only says who gets them.
+          Launch. {config.appName} scans every long.xyz launch and picks yours up within a few minutes. It checks the launch
+          transaction itself, so only tokens whose fees really reach {config.appName} are counted; the bio only says who gets
+          them.
         </li>
       </ol>
 
@@ -55,10 +49,10 @@ export default function Docs() {
 
       <h2 id="flow">Where the money goes</h2>
       <ol>
-        <li>The token trades on {config.launchpad.name}. Creator fees build up in the {config.appName} wallet.</li>
+        <li>The token trades on long.xyz. Creator fees build up for our treasury.</li>
         <li>
-          The team claims each token's fees on-chain regularly and records the claim with its transaction signature, which is
-          checked on-chain.
+          The team claims each token's fees on-chain regularly and records the claim with its transaction hash, which is checked
+          on-chain. Claiming on every trade would cost more in gas than quiet tokens earn.
         </li>
         <li>
           Each claim is split: {share}% is credited to the X account in the token's metadata, {100 - share}% buys back and burns.

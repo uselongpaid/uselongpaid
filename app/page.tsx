@@ -9,10 +9,6 @@ import { LiveStats } from "@/components/LiveStats.tsx";
 import { FeesChart } from "@/components/FeesChart.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
 import { FeeFlow } from "@/components/FeeFlow.tsx";
-import { CoinCard } from "@/components/CoinCard.tsx";
-import { ProjectCoin } from "@/components/ProjectCoin.tsx";
-import { marketWithin } from "@/lib/marketData.ts";
-import { listCoins } from "@/lib/coins.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -21,28 +17,24 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
   const d = db();
   const feeHandle = config.detect.handle ? `@${config.detect.handle}` : config.appName;
   const stats = getStats(d);
-  const coins = listCoins(d, { limit: 6 });
-  const projectMarket = config.projectCoin.mint ? await marketWithin(config.projectCoin.mint) : null;
   const share = config.recipientShareBps / 100;
 
   const minMilestone = formatUsd(config.milestones.list[0]);
   const xUrl = config.detect.handle ? `https://x.com/${config.detect.handle}` : null;
   const viaXMoney = config.payoutProvider === "xmoney";
-  const lp = config.launchpad;
-  const feeWallet = config.feeWallet ? `${config.feeWallet.slice(0, 4)}…${config.feeWallet.slice(-4)}` : `${config.appName} wallet`;
 
   return (
     <>
       <div className="hero hero-split">
         <div>
           <div className="eyebrow">
-            <span className="dot" /> Live on {lp.network} · built for {lp.name}
+            <span className="dot" /> Live on Robinhood Chain · built for long.xyz
           </div>
           <h1>
-            Send {lp.name} token fees to <span className="hl">any X account.</span>
+            Send long.xyz token fees to <span className="hl">any X account.</span>
           </h1>
           <p className="lede">
-            Launch on {lp.name}, send the creator fees to {config.appName} and write <strong>fees @yourhandle</strong> in the bio.{" "}
+            Launch on app.long.xyz, send the fees to {feeHandle} and write <strong>fees @yourhandle</strong> in the bio.{" "}
             {share}% of the creator fees are paid out to that X account in dollars{viaXMoney ? " through X Money" : ""}. The other{" "}
             {100 - share}% buys back and burns.
           </p>
@@ -68,7 +60,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
           <Lookup />
           {notfound !== undefined && (
             <p className="field-error" style={{ marginTop: 10 }}>
-              &quot;{notfound}&quot; isn&apos;t an X handle or a token address. Try @handle or a token address.
+              &quot;{notfound}&quot; isn&apos;t an X handle or a token address. Try @handle or 0x…
             </p>
           )}
         </div>
@@ -78,7 +70,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
             <span className="flow-dot" />
             <span className="flow-dot" />
             <span className="flow-dot" />
-            <span className="muted mono">{lp.name} · launch</span>
+            <span className="muted mono">app.long.xyz · create</span>
           </div>
           <div className="flow-field">
             <span className="copy-label">Token</span>
@@ -87,8 +79,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
             </span>
           </div>
           <div className="flow-field">
-            <span className="copy-label">Creator fees to</span>
-            <span className="mono">{feeWallet}</span>
+            <span className="copy-label">Fee receiver</span>
+            <span className="mono">{feeHandle}</span>
           </div>
           <div className="flow-field">
             <span className="copy-label">Bio</span>
@@ -96,7 +88,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
               to the moon. <span className="hl-text">fees @alice</span>
             </span>
           </div>
-          <div className="flow-arrow">↓ {config.appName} checks it on chain</div>
+          <div className="flow-arrow">↓ {config.appName} detects it on chain</div>
           <div className="flow-result">
             <div>
               <div className="copy-label">@alice earns</div>
@@ -112,31 +104,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
 
       <LiveStats initial={stats} />
 
-      {config.projectCoin.mint && (
-        <ProjectCoin
-          mint={config.projectCoin.mint}
-          fallbackSymbol={config.projectCoin.symbol}
-          initial={projectMarket}
-          tradeUrl={config.launchpad.tokenUrl.replace("{mint}", config.projectCoin.mint)}
-          explorerUrl={config.chain.explorerUrl}
-        />
-      )}
-
       <section>
         <h2>How it works</h2>
         <div className="steps">
           <div className="step">
             <div className="n">01</div>
-            <h3>Launch on {lp.name}</h3>
+            <h3>Launch on app.long.xyz</h3>
             <p>
-              Send the creator fees to {config.appName} and write <strong>fees @yourhandle</strong> in the bio. Tag {feeHandle} on X and the
-              team adds the token. <Link href="/launch">Launch guide.</Link>
+              Set the fee receiver to {feeHandle} and write <strong>fees @yourhandle</strong> in the bio. {config.appName} picks the
+              token up automatically. <Link href="/launch">Launch guide.</Link>
             </p>
           </div>
           <div className="step">
             <div className="n">02</div>
             <h3>Fees are claimed on-chain</h3>
-            <p>Creator fees are claimed regularly. Every claim is published with its transaction signature and credited to the X account.</p>
+            <p>Creator fees are claimed regularly. Every claim is published with its transaction hash and credited to the X account.</p>
           </div>
           <div className="step">
             <div className="n">03</div>
@@ -156,23 +138,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
         </div>
       </section>
 
-      {coins.length > 0 && (
-        <section>
-          <div className="admin-head">
-            <h2>New launches</h2>
-            <Link href="/coins">All coins →</Link>
-          </div>
-          <div className="coin-grid">
-            {coins.map((c) => (
-              <CoinCard key={c.id} c={c} />
-            ))}
-          </div>
-        </section>
-      )}
-
       <section>
         <h2>Where the fees go</h2>
-        <FeeFlow share={share} handle={config.detect.handle || "longpaid"} launchpad={lp.name} network={lp.network} />
+        <FeeFlow share={share} handle={config.detect.handle || "longpaid"} />
       </section>
 
       <section className="two-col">
@@ -273,21 +241,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
             <summary>Do I need to sign up to earn?</summary>
             {viaXMoney ? (
               <p>
-                No. If a token&apos;s bio says fees @you and its fees go to {config.appName}, you&apos;re earning, and payouts are sent to
+                No. If a token&apos;s bio says fees @you and its fees go to {feeHandle}, you&apos;re earning, and payouts are sent to
                 your @handle through X Money. There&apos;s nothing to connect.
               </p>
             ) : (
               <p>
-                No. If a token&apos;s bio says fees @you and its fees go to {config.appName}, you&apos;re earning. To receive payouts,{" "}
+                No. If a token&apos;s bio says fees @you and its fees go to {feeHandle}, you&apos;re earning. To receive payouts,{" "}
                 <Link href="/wallet">connect a wallet</Link> and link your X account once.
               </p>
             )}
           </details>
           <details>
-            <summary>Is my token still a normal {lp.name} token?</summary>
-            <p>
-              Yes. You launch on {lp.name}, so it&apos;s listed there and trades like any other {lp.name} token on {lp.network}.
-            </p>
+            <summary>Is my token still a normal long.xyz token?</summary>
+            <p>Yes. You launch on app.long.xyz, so it&apos;s listed there and trades like any other long.xyz token.</p>
           </details>
           {viaXMoney && (
             <details>
@@ -316,8 +282,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
             <p>The token still shows up for the team, who can assign the right handle by hand. Reach out on X.</p>
           </details>
           <details>
-            <summary>Is {config.appName} part of {lp.name}?</summary>
-            <p>No. {config.appName} is an independent project built on top of {lp.name}.</p>
+            <summary>Is {config.appName} part of long.xyz?</summary>
+            <p>No. {config.appName} is an independent project built on top of long.xyz.</p>
           </details>
         </div>
       </section>
@@ -326,7 +292,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
         <div>
           <h2>Launch a token that pays someone.</h2>
           <p className="muted">
-            Creator fees to {config.appName} · bio <span className="mono">fees @yourhandle</span>
+            Fee receiver {feeHandle} · bio <span className="mono">fees @yourhandle</span>
           </p>
         </div>
         <div className="cta-row">

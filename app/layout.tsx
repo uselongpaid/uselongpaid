@@ -4,14 +4,13 @@ import { config } from "@/lib/config.ts";
 import { Logo } from "@/components/Logo.tsx";
 import { WalletProvider } from "@/components/WalletProvider.tsx";
 import { ConnectButton } from "@/components/ConnectButton.tsx";
-import { SolanaConnectButton, SolanaWalletProvider } from "@/components/SolanaWallet.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: `${config.appName} — creator fees for ${config.launchpad.name} tokens, paid to X accounts`,
+  title: `${config.appName} — creator fees for long.xyz tokens, paid to X accounts`,
   description:
-    `Point a ${config.launchpad.name} token's creator fees at any X account. Fees are claimed on-chain, 80% is paid out in dollars and 20% buys back and burns.`,
+    "Point a long.xyz token's creator fees at any X account. Fees are claimed on-chain, 80% is paid out in dollars and 20% buys back and burns.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +18,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <WalletProvider>
-        <SolanaWalletProvider>
         <header className="site">
           <div className="wrap">
             <Link href="/" className="brand">
@@ -27,7 +25,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <div className="nav-right">
               <nav className="links">
-                <Link href="/coins">Coins</Link>
                 <Link href="/launch">Launch</Link>
                 <Link href="/check">Check</Link>
                 <Link href="/leaderboard">Leaderboard</Link>
@@ -38,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <XIcon size={15} />
                 </a>
               )}
-              {config.payoutProvider === "erc20" ? <ConnectButton /> : config.launch.enabled && <SolanaConnectButton />}
+              {config.payoutProvider === "erc20" && <ConnectButton />}
             </div>
           </div>
         </header>
@@ -50,21 +47,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Logo size={22} /> {config.appName}
               </Link>
               <p className="muted" style={{ marginTop: 10, maxWidth: 360 }}>
-                Launch on {config.launchpad.name}, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
+                Launch on long.xyz, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
                 {100 - config.recipientShareBps / 100}% buyback and burn.
               </p>
-              {config.projectCoin.mint && (
-                <p className="footer-ca">
-                  <span className="copy-label">CA</span>{" "}
-                  <a className="mono" href="/#coin">
-                    {config.projectCoin.mint}
-                  </a>
-                </p>
-              )}
             </div>
             <div className="footer-links">
               <span className="copy-label">Product</span>
-              <Link href="/coins">Coins</Link>
               <Link href="/launch">Launch guide</Link>
               <Link href="/check">Check a token</Link>
               {config.payoutProvider === "erc20" && <Link href="/wallet">Claim your fees</Link>}
@@ -73,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="footer-links">
               <span className="copy-label">Resources</span>
               <Link href="/docs">Docs</Link>
-              <a href={config.launchpad.url} target="_blank" rel="noreferrer">{config.launchpad.name}</a>
+              <a href="https://app.long.xyz" target="_blank" rel="noreferrer">app.long.xyz</a>
               {config.detect.handle && (
                 <a href={`https://x.com/${config.detect.handle}`} target="_blank" rel="noreferrer">
                   X · @{config.detect.handle}
@@ -82,10 +70,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="wrap footer-note">
-            {config.appName} is an independent project. It is not affiliated with {config.launchpad.name} or X.
+            {config.appName} is an independent project. It is not affiliated with long.xyz or X.
           </div>
         </footer>
-        </SolanaWalletProvider>
         </WalletProvider>
       </body>
     </html>

@@ -1,5 +1,4 @@
 import type { Db } from "./db.ts";
-import { normalizeAddress } from "./address.ts";
 
 export type Stats = { claimedMicros: number; paidMicros: number; burnedMicros: number; tokens: number; accounts: number };
 
@@ -48,7 +47,7 @@ export function listTokens(
 }
 
 export function getToken(db: Db, address: string): TokenRow | null {
-  return (db.prepare("SELECT * FROM tokens WHERE address = ?").get(normalizeAddress(address)) as TokenRow | undefined) ?? null;
+  return (db.prepare("SELECT * FROM tokens WHERE address = ?").get(address.toLowerCase()) as TokenRow | undefined) ?? null;
 }
 
 export function tokenTotals(db: Db, address: string) {
@@ -57,7 +56,7 @@ export function tokenTotals(db: Db, address: string) {
       `SELECT COUNT(*) AS claims, COALESCE(SUM(recipient_micros),0) AS recipient, COALESCE(SUM(burn_micros),0) AS burn
        FROM claims WHERE token = ?`,
     )
-    .get(normalizeAddress(address)) as { claims: number; recipient: number; burn: number };
+    .get(address.toLowerCase()) as { claims: number; recipient: number; burn: number };
 }
 
 export type AccountRow = {
@@ -103,7 +102,7 @@ export function recentClaims(db: Db, opts: { handle?: string; token?: string; li
   }
   if (opts.token) {
     where.push("c.token = ?");
-    args.push(normalizeAddress(opts.token));
+    args.push(opts.token.toLowerCase());
   }
   args.push(opts.limit ?? 20);
   return db
@@ -248,5 +247,5 @@ export function listDetected(db: Db, status?: DetectedRow["status"], limit = 50)
 }
 
 export function getDetected(db: Db, asset: string): DetectedRow | null {
-  return (db.prepare("SELECT * FROM detected_launches WHERE asset = ?").get(normalizeAddress(asset)) as DetectedRow | undefined) ?? null;
+  return (db.prepare("SELECT * FROM detected_launches WHERE asset = ?").get(asset.toLowerCase()) as DetectedRow | undefined) ?? null;
 }

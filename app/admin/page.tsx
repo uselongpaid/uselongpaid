@@ -10,13 +10,12 @@ import { db, payoutProvider } from "@/lib/server.ts";
 import { Erc20PayoutProvider } from "@/lib/payouts/erc20.ts";
 import { shortAddr, timeAgo } from "@/components/Tables.tsx";
 import { CopyButton } from "@/components/CopyButton.tsx";
-import { isTxId } from "@/lib/address.ts";
 
 export const dynamic = "force-dynamic";
 
 function TxLink({ hash }: { hash: string | null }) {
   if (!hash) return <span className="muted">—</span>;
-  if (!isTxId(hash)) return <span className="mono">{hash}</span>;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) return <span className="mono">{hash}</span>;
   return config.explorerTxUrl ? (
     <a className="mono" href={config.explorerTxUrl.replace("{hash}", hash)} target="_blank" rel="noreferrer">
       {shortAddr(hash)}
@@ -97,7 +96,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <section className="panel">
           <h2>1. Record a claim</h2>
           <p className="muted">
-            Claim the token's creator fees on {config.launchpad.name} with the LongPaid wallet, then record it here. The split, milestones and payouts run
+            Claim the token's creator fees on long.xyz from the treasury, then record it here. The split, milestones and payouts run
             automatically.
           </p>
           {tokens.length === 0 ? (
@@ -123,12 +122,12 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
                 <input name="amount" inputMode="decimal" placeholder="125.40" required />
               </label>
               <label className="field">
-                <span>Claim transaction signature</span>
-                <input name="tx" placeholder="5h3k…" required />
+                <span>Claim transaction hash</span>
+                <input name="tx" placeholder="0x…" required pattern="0x[0-9a-fA-F]{64}" />
               </label>
               <label className="field">
                 <span>Note (optional)</span>
-                <input name="note" placeholder="e.g. 1.25 SOL @ $180" />
+                <input name="note" placeholder="e.g. 0.42 NVDA @ $298.50" />
               </label>
               <button className="btn" type="submit">
                 Record claim and distribute
@@ -140,13 +139,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <section className="panel">
           <h2>2. Add or update a token</h2>
           <p className="muted">
-            Only add tokens whose creator fees are paid to the LongPaid wallet.
+            Only add tokens whose creator-fee beneficiary is the treasury. {config.long.rpcUrl ? "Name and symbol are read from chain if left empty." : ""}
           </p>
           <form action="/api/admin/action" method="post" className="stack">
             <input type="hidden" name="action" value="add-token" />
             <label className="field">
-              <span>Token mint address</span>
-              <input name="address" placeholder={`Mint address from ${config.launchpad.name}`} required />
+              <span>Token address</span>
+              <input name="address" placeholder="0x…" required pattern="0x[0-9a-fA-F]{40}" />
             </label>
             <label className="field">
               <span>X handle that gets the fees</span>
@@ -155,11 +154,11 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
             <div className="row2">
               <label className="field">
                 <span>Name</span>
-                <input name="name" placeholder="Moon Nvidia" required />
+                <input name="name" placeholder={config.long.rpcUrl ? "(from chain)" : "Moon Nvidia"} required={!config.long.rpcUrl} />
               </label>
               <label className="field">
                 <span>Symbol</span>
-                <input name="symbol" placeholder="MOON" required />
+                <input name="symbol" placeholder={config.long.rpcUrl ? "(from chain)" : "MOON"} required={!config.long.rpcUrl} />
               </label>
             </div>
             <button className="btn" type="submit">
@@ -169,7 +168,6 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         </section>
       </div>
 
-      {detectionEnabled() && (
       <section>
         <div className="admin-head">
           <h2>Launches on app.long.xyz</h2>
@@ -263,7 +261,6 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           detectionEnabled() && <div className="empty">No launches routed to LongPaid yet.</div>
         )}
       </section>
-      )}
 
       <section>
         <h2>Wallet link requests</h2>
@@ -478,7 +475,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           </p>
           <form action="/api/admin/action" method="post" className="inline">
             <input type="hidden" name="action" value="burns-done" />
-            <input name="tx" placeholder="Burn tx signature" required />
+            <input name="tx" placeholder="0x… burn tx" required pattern="0x[0-9a-fA-F]{64}" />
             <button className="btn btn-small" type="submit" disabled={burnPending === 0}>
               Mark burned
             </button>

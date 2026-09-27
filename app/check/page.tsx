@@ -4,9 +4,10 @@ import { getDetected, getToken } from "@/lib/queries.ts";
 import { config } from "@/lib/config.ts";
 import { db, feeSource } from "@/lib/server.ts";
 import type { Inspection } from "@/lib/sources/types.ts";
-import { isTokenAddress } from "@/lib/address.ts";
 
 export const dynamic = "force-dynamic";
+
+const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
 function Row({ ok, title, detail }: { ok: boolean | null; title: string; detail: React.ReactNode }) {
   const mark = ok === null ? "–" : ok ? "✓" : "✕";
@@ -25,7 +26,7 @@ function Row({ ok, title, detail }: { ok: boolean | null; title: string; detail:
 
 export default async function Check({ searchParams }: { searchParams: Promise<{ address?: string }> }) {
   const address = ((await searchParams).address ?? "").trim();
-  const valid = isTokenAddress(address);
+  const valid = ADDR_RE.test(address);
 
   let inspection: Inspection | null = null;
   let error: string | null = null;
@@ -44,15 +45,15 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
   return (
     <div className="docs">
       <h1>Eligibility checker</h1>
-      <p className="muted">Paste a {config.launchpad.name} token address to see whether its fees reach an X account.</p>
+      <p className="muted">Paste a long.xyz token address to see whether its fees reach an X account.</p>
       <form className="lookup" action="/check" method="get" style={{ marginTop: 20 }}>
-        <input name="address" defaultValue={address} placeholder="Token mint address" aria-label="Token address" autoComplete="off" required />
+        <input name="address" defaultValue={address} placeholder="0x…" aria-label="Token address" autoComplete="off" required />
         <button className="btn" type="submit">
           Check
         </button>
       </form>
 
-      {address && !valid && <p className="notice error">That isn't a token address. Paste the token's mint address.</p>}
+      {address && !valid && <p className="notice error">That isn't a token address. It should be 0x followed by 40 hex characters.</p>}
       {error && <p className="notice error">Couldn't read the chain: {error}</p>}
 
       {valid && inspection && (
@@ -64,7 +65,7 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
           <ul className="checks">
             <Row
               ok={inspection.exists ?? (tracked || detected ? true : null)}
-              title="Token found on chain"
+              title="Token contract found"
               detail={
                 inspection.exists === null
                   ? tracked || detected
@@ -77,13 +78,13 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
             />
             <Row
               ok={detected ? true : tracked ? true : null}
-              title={`Creator fees go to ${config.appName}`}
+              title={`Fees sent to ${handleLabel}`}
               detail={
                 detected
-                  ? "Confirmed in the launch transaction."
+                  ? "Confirmed in the launch transaction on long.xyz."
                   : tracked
                     ? "Added by the team."
-                    : `Not added yet. Tag ${handleLabel} on X with the token address and the team adds it.`
+                    : `Not seen yet. New launches are picked up within a few minutes if their fee receiver is ${handleLabel}.`
               }
             />
             <Row
