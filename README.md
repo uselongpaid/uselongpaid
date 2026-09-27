@@ -5,7 +5,7 @@
 <h1 align="center">LongPaid</h1>
 
 <p align="center">
-  Route the creator fees of <a href="https://long.xyz">long.xyz</a> tokens to any X account — split on-chain, paid out automatically.
+  Route the creator fees of <a href="https://www.stonkfun.xyz">stonkfun.xyz</a> tokens on Solana to any X account — split on a public ledger, paid out through X Money.
 </p>
 
 <p align="center">
@@ -18,10 +18,11 @@
 
 ---
 
-A creator launches on **app.long.xyz** as usual, sets the fee receiver to **@LongPaid** and writes **`fees @handle`** in the
-token bio. LongPaid scans every long.xyz launch, confirms in the launch transaction that the fees really go to LongPaid,
-reads the handle from the bio and registers the token on its own. The team claims the fees on-chain and records each
-claim with its transaction hash. From that moment on, everything is automatic:
+A creator launches on **stonkfun.xyz** (Solana) as usual, sends the creator fees to **LongPaid's wallet**
+(`LONGPAID_FEE_WALLET`) and writes **`fees @handle`** in the token bio, then tags **@uselongpaid** on X with the token
+address. The team checks on-chain that the fees reach LongPaid and adds the token in `/admin`. The team claims the fees and
+records each claim with its Solana transaction signature, which is checked on-chain. From that moment on, everything is
+automatic:
 
 - **80%** is credited to the X account, **20%** is set aside to buy back and burn.
 - Every time the account's lifetime earnings cross a milestone — **$5, $10, $20, $50, $100, $250, $500, $1,000**, then every
@@ -29,7 +30,7 @@ claim with its transaction hash. From that moment on, everything is automatic:
 - Payouts are sent in dollars **through X Money, straight to the @handle**, from LongPaid's pre-funded X Money balance. The
   recipient doesn't sign up or connect anything.
 
-> LongPaid is an independent project. It is not affiliated with long.xyz, X, or UsePaid.
+> LongPaid is an independent project. It is not affiliated with stonkfun.xyz, X, or UsePaid.
 
 ## Contents
 
@@ -37,7 +38,7 @@ claim with its transaction hash. From that moment on, everything is automatic:
 - [Features](#features)
 - [Architecture](#architecture)
 - [The money flow in detail](#the-money-flow-in-detail)
-- [Detecting launches on app.long.xyz](#detecting-launches-on-applongxyz)
+- [Optional: detecting launches on app.long.xyz](#optional-detecting-launches-on-applongxyz)
 - [Payout safety](#payout-safety)
 - [X Money payouts](#x-money-payouts)
 - [Linking a payout wallet (erc20 mode)](#linking-a-payout-wallet-erc20-mode)
@@ -57,27 +58,27 @@ claim with its transaction hash. From that moment on, everything is automatic:
 sequenceDiagram
     autonumber
     participant C as Token creator
-    participant L as long.xyz
+    participant L as stonkfun.xyz
     participant D as Dev (admin)
     participant F as LongPaid
     participant X as Account owner
-    participant B as Chain
+    participant B as Solana
 
-    C->>L: Launch on app.long.xyz (fee receiver @LongPaid, bio "fees @handle")
-    F->>B: Scan LaunchMetadata events · check fee beneficiary in launch tx
-    F->>F: Read "fees @handle" from the bio · register token
-    L-->>B: Trading accrues creator fees to the treasury
-    D->>B: Claim fees from the treasury
-    D->>F: Record claim (USD value + tx hash)
-    F->>B: Verify tx receipt succeeded
+    C->>L: Launch (creator fees → LongPaid wallet, bio "fees @handle")
+    C->>D: Tag @uselongpaid on X with the token address
+    D->>F: Check fees reach LongPaid · add token for @handle
+    L-->>B: Trading accrues creator fees to the LongPaid wallet
+    D->>B: Claim the fees
+    D->>F: Record claim (USD value + tx signature)
+    F->>B: getSignatureStatuses: confirmed and succeeded
     F->>F: Split 80/20 · credit @handle · check milestones
-    X->>F: Connect wallet · sign message · post code from X
-    D->>F: Check the post · approve wallet link
-    F->>B: Transfer stablecoin to wallet (automatic)
-    F-->>X: Payout shows as paid with tx hash
+    F->>D: Milestone reached · payout queued
+    D->>X: Send dollars on X Money from @uselongpaid
+    D->>F: Mark sent
+    F-->>X: Profile shows the payout
 ```
 
-Claims are **manual by design**: the dev claims on long.xyz whenever it's worth the gas and records the result. Every step
+Claims are **manual by design**: the dev claims on stonkfun.xyz and records the result. Every step
 after that — the split, milestone tracking, queueing and the on-chain payout — runs without anyone touching it.
 
 ## Features
@@ -193,8 +194,9 @@ out before the receipt came back. LongPaid never guesses in that case.
 5. Providers that dedupe on their own side (`webhook`, keyed on `idempotencyKey`) declare `retrySafe = true` and are retried
    automatically.
 
-## Detecting launches on app.long.xyz
+## Optional: detecting launches on app.long.xyz
 
+The original EVM integration is still in the code and off by default (set `LONGPAID_FEE_WALLETS` to turn it on).
 LongPaid doesn't launch tokens itself: long.xyz's `LongLaunchFactory`
 ([`0x1Eef…2104`](https://robinhoodchain.blockscout.com/address/0x1Eef016F22A943abC7DD11422EDeE9D235942104)) only accepts
 launches signed by long.xyz's backend. Creators launch on app.long.xyz, and LongPaid watches the factory
@@ -300,22 +302,20 @@ Schedule distribution so late wallet links and payouts that waited on a top-up g
 
 **Setting up**
 
-1. Log in to app.long.xyz with LongPaid's X account and copy its wallet address. Set `LONGPAID_X_HANDLE` and
-   `LONGPAID_FEE_WALLETS`.
-2. Do one test launch with fee receiver `@LONGPAID_X_HANDLE` and bio `fees @yourhandle`; within a few minutes it shows
-   as registered in `/admin` → **Launches on app.long.xyz**.
+1. Set `LONGPAID_FEE_WALLET` to LongPaid's Solana wallet and `LONGPAID_X_HANDLE` to its X account. `/launch` shows the
+   wallet with a copy button.
+2. Do one test launch on stonkfun.xyz with the creator fees going to that wallet and bio `fees @yourhandle`.
 
 **Onboarding a token**
 
-Nothing to do: tokens launched with the right fee receiver and bio register themselves. Only tokens listed under
-**Launches on app.long.xyz** as *needs handle* want attention. Tokens launched some other way can still be added by hand
-under **Add or update a token**.
+When a creator tags `@LONGPAID_X_HANDLE` with a token address, open it on Solscan and check that its creator fees go to
+`LONGPAID_FEE_WALLET`. Then add it in `/admin` → **Add or update a token** with its mint address, handle, name and symbol.
 
 **Recording a claim**
 
-1. Claim the token's creator fees on long.xyz from the treasury wallet.
-2. In `/admin` → **Record a claim**, pick the token, enter the USD value you received and the claim tx hash. Optionally add a
-   note, for example `0.42 NVDA @ $298.50`.
+1. Claim the token's creator fees on stonkfun.xyz with the LongPaid wallet.
+2. In `/admin` → **Record a claim**, pick the token, enter the USD value you received and the claim tx signature. Optionally
+   add a note, for example `1.25 SOL @ $180`.
 3. Submit. The result message shows the split, whether a milestone was hit, and what was paid out.
 
 **Approving wallet links**
@@ -342,7 +342,10 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `ADMIN_PASSWORD` | yes | Password for `/admin`. |
 | `CRON_SECRET` | yes | Bearer token for `/api/cron/*` and the JSON admin API. |
 | `APP_URL` | yes | Public URL. Used for same-origin checks. |
-| `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_CHAIN_NAME`, `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_EXPLORER_URL` | | Chain for Connect wallet and the default for every RPC. Defaults to Robinhood Chain mainnet (`4663`). Set at build time. |
+| `LAUNCHPAD_NAME`, `LAUNCHPAD_URL`, `LAUNCHPAD_LAUNCH_URL` | | Where tokens launch. Default `stonkfun.xyz`, `https://www.stonkfun.xyz`, `https://www.stonkfun.xyz/launch`. |
+| `LONGPAID_FEE_WALLET` | yes | LongPaid's Solana wallet that receives the creator fees. Shown on `/launch`. |
+| `SOLANA_RPC_URL` | | Confirms claim and burn signatures and that a mint exists. Default `https://api.mainnet-beta.solana.com`. |
+| `NEXT_PUBLIC_CHAIN_NAME`, `NEXT_PUBLIC_EXPLORER_URL` | | Network name and explorer. Default `Solana` and `https://solscan.io`. Set at build time. |
 | `DATABASE_PATH` | | SQLite file. Default `./data/longpaid.db`. |
 | `LONG_RPC_URL`, `LONG_CHAIN_ID` | | RPC for claim-tx verification, wallet signatures and token info. Defaults to the chain above; use a dedicated provider in production. |
 | `TREASURY_ADDRESS` | yes | Fee beneficiary shown in the launch guide. |
@@ -354,8 +357,8 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `PAYOUT_RPC_URL`, `PAYOUT_CHAIN_ID` | | Payout chain, if different from the long.xyz chain. |
 | `PAYOUT_WEBHOOK_URL`, `PAYOUT_WEBHOOK_SECRET` | webhook | Your payout service and HMAC secret. |
 | `EXPLORER_TX_URL` | | For example `https://explorer.example/tx/{hash}`, for tx links in `/admin`. |
-| `LONGPAID_X_HANDLE` | yes | LongPaid's X account, the fee receiver creators enter on app.long.xyz. |
-| `LONGPAID_FEE_WALLETS` | yes | Wallet(s) long.xyz pays that account's fees to. Launches are only counted when one of these is a fee beneficiary. |
+| `LONGPAID_X_HANDLE` | yes | LongPaid's X account. Creators tag it; X Money payouts are sent from it. |
+| `LONGPAID_FEE_WALLETS` | | Optional long.xyz (EVM) scanning. Empty = off. |
 | `LONG_FACTORY_ADDRESS` | | long.xyz's `LongLaunchFactory`. Default `0x1Eef016F22A943abC7DD11422EDeE9D235942104`. |
 | `LONG_FACTORY_START_BLOCK` | | First block to scan on a fresh database. Default: the current block. |
 | `LONG_SYNC_INTERVAL_MS` | | Background scan interval. Default `120000`; `0` turns it off. |

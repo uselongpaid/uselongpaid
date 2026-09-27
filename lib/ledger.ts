@@ -1,4 +1,5 @@
 import { type Db, tx } from "./db.ts";
+import { normalizeAddress } from "./address.ts";
 import { splitClaim } from "./money.ts";
 import { highestReached, type Milestones, nextMilestone } from "./milestones.ts";
 
@@ -21,7 +22,7 @@ export function upsertToken(db: Db, t: TokenRecord) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(address) DO UPDATE SET name = excluded.name, symbol = excluded.symbol,
        image = excluded.image, handle = excluded.handle`,
-  ).run(t.address.toLowerCase(), t.chainId, t.name, t.symbol, t.image ?? null, t.handle, t.creator ?? null, t.launchedAt);
+  ).run(normalizeAddress(t.address), t.chainId, t.name, t.symbol, t.image ?? null, t.handle, t.creator ?? null, t.launchedAt);
   ensureAccount(db, t.handle);
 }
 
@@ -47,7 +48,7 @@ export function recordClaim(
     if (txHash && db.prepare("SELECT 1 FROM claims WHERE tx_hash = ?").get(txHash)) {
       throw new Error(`transaction ${txHash} is already recorded`);
     }
-    const token = db.prepare("SELECT handle FROM tokens WHERE address = ?").get(tokenAddress.toLowerCase()) as
+    const token = db.prepare("SELECT handle FROM tokens WHERE address = ?").get(normalizeAddress(tokenAddress)) as
       | { handle: string }
       | undefined;
     if (!token) throw new Error(`unknown token ${tokenAddress}`);
@@ -66,8 +67,8 @@ export function recordClaim(
         `INSERT INTO claims (token, handle, amount_micros, recipient_micros, burn_micros, tx_hash, note, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(tokenAddress.toLowerCase(), token.handle, amountMicros, recipient, burn, txHash, note, now);
-    db.prepare("UPDATE tokens SET fees_micros = fees_micros + ? WHERE address = ?").run(amountMicros, tokenAddress.toLowerCase());
+      .run(normalizeAddress(tokenAddress), token.handle, amountMicros, recipient, burn, txHash, note, now);
+    db.prepare("UPDATE tokens SET fees_micros = fees_micros + ? WHERE address = ?").run(amountMicros, normalizeAddress(tokenAddress));
     db.prepare(
       "UPDATE accounts SET balance_micros = balance_micros + ?, lifetime_micros = lifetime_micros + ? WHERE handle = ?",
     ).run(recipient, recipient, token.handle);

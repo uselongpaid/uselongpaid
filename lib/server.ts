@@ -25,7 +25,7 @@ export function feeSource(): FeeSource {
 }
 
 export function manualSource(): ManualFeeSource {
-  return new ManualFeeSource(config.long.rpcUrl);
+  return new ManualFeeSource(config.long.rpcUrl, config.solanaRpcUrl);
 }
 
 export function payoutProvider(): PayoutProvider {

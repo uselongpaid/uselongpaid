@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAddress, getAddress } from "viem";
+import { getAddress } from "viem";
+import { isEvmAddress, isTokenAddress, isTxId, normalizeTxId } from "@/lib/address.ts";
 import { config } from "@/lib/config.ts";
 import { sameOrigin } from "@/lib/auth.ts";
 import { redirectTo } from "@/lib/http.ts";
@@ -15,8 +16,6 @@ import { registerDetected } from "@/lib/long/sync.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-const TX_RE = /^0x[0-9a-fA-F]{64}$/;
 
 function back(params: Record<string, string>) {
   return redirectTo(`/admin?${new URLSearchParams(params)}`);
@@ -45,7 +44,7 @@ export async function POST(req: Request) {
     switch (s("action")) {
       case "add-token": {
         const address = s("address");
-        if (!isAddress(address)) return back({ err: "Token address isn't valid." });
+        if (!isTokenAddress(address)) return back({ err: "Token address isn't valid. Paste the token's mint address." });
         const handle = normalizeHandle(s("handle"));
         if (!handle) return back({ err: "X handle isn't valid." });
         let name = s("name");
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
         }
         const existing = getToken(d, address);
         upsertToken(d, {
-          address: getAddress(address),
+          address: isEvmAddress(address) ? getAddress(address) : address,
           chainId: config.long.chainId,
           name,
           symbol,
@@ -75,8 +74,8 @@ export async function POST(req: Request) {
         if (!token) return back({ err: "Pick a token." });
         const micros = parseUsd(s("amount"));
         if (!micros) return back({ err: "Enter the claimed amount in USD, for example 125.40." });
-        const txHash = s("tx").toLowerCase();
-        if (!TX_RE.test(txHash)) return back({ err: "Enter the claim transaction hash (0x + 64 hex characters)." });
+        const txHash = normalizeTxId(s("tx"));
+        if (!isTxId(txHash)) return back({ err: "Enter the claim transaction signature." });
         const ok = await manualSource().txSucceeded(txHash);
         if (ok === false) return back({ err: "That transaction wasn't found on chain or it failed." });
 
@@ -111,8 +110,8 @@ export async function POST(req: Request) {
       }
 
       case "burns-done": {
-        const txHash = s("tx");
-        if (!TX_RE.test(txHash)) return back({ err: "Enter the buyback-and-burn transaction hash." });
+        const txHash = normalizeTxId(s("tx"));
+        if (!isTxId(txHash)) return back({ err: "Enter the buyback-and-burn transaction hash." });
         const n = markAllBurnsDone(d, txHash);
         return back({ msg: `${n} pending burn(s) marked done.` });
       }

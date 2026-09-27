@@ -8,9 +8,9 @@ import { XIcon } from "@/components/XIcon.tsx";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: `${config.appName} — creator fees for long.xyz tokens, paid to X accounts`,
+  title: `${config.appName} — creator fees for ${config.launchpad.name} tokens, paid to X accounts`,
   description:
-    "Point a long.xyz token's creator fees at any X account. Fees are claimed on-chain, 80% is paid out in dollars and 20% buys back and burns.",
+    `Point a ${config.launchpad.name} token's creator fees at any X account. Fees are claimed on-chain, 80% is paid out in dollars and 20% buys back and burns.`,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -47,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Logo size={22} /> {config.appName}
               </Link>
               <p className="muted" style={{ marginTop: 10, maxWidth: 360 }}>
-                Launch on long.xyz, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
+                Launch on {config.launchpad.name}, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
                 {100 - config.recipientShareBps / 100}% buyback and burn.
               </p>
             </div>
@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="footer-links">
               <span className="copy-label">Resources</span>
               <Link href="/docs">Docs</Link>
-              <a href="https://app.long.xyz" target="_blank" rel="noreferrer">app.long.xyz</a>
+              <a href={config.launchpad.url} target="_blank" rel="noreferrer">{config.launchpad.name}</a>
               {config.detect.handle && (
                 <a href={`https://x.com/${config.detect.handle}`} target="_blank" rel="noreferrer">
                   X · @{config.detect.handle}
@@ -70,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="wrap footer-note">
-            {config.appName} is an independent project. It is not affiliated with long.xyz or X.
+            {config.appName} is an independent project. It is not affiliated with {config.launchpad.name} or X.
           </div>
         </footer>
         </WalletProvider>

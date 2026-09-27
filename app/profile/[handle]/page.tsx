@@ -59,7 +59,7 @@ export default async function Profile({ params }: { params: Promise<{ handle: st
 
       {!account && (
         <p className="notice">
-          No tokens route fees to @{handle} yet. Launch one on long.xyz with this handle in its metadata and it will show up
+          No tokens route fees to @{handle} yet. Launch one on {config.launchpad.name} with this handle in its bio and it will show up
           here once the team adds it.
         </p>
       )}
