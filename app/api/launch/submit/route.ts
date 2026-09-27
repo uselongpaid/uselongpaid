@@ -3,9 +3,8 @@ import { sameOrigin } from "@/lib/auth.ts";
 import { jsonError, launcher, publicLaunch } from "@/lib/launch-api.ts";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
 
-/** Relays the wallet-signed launch to stonkfun. */
+/** Sends the wallet-signed launch to Solana. */
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "bad origin" }, { status: 403 });
   try {

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
 
-// Launch on stonkfun.xyz from this site. The connected wallet signs and pays the launch itself (stonkfun's price);
-// the site only relays the prepared and signed transaction to stonkfun's API.
+// Launch a stonkfun.xyz coin from this site. The server builds a Raydium LaunchLab launch under StonkFun's platform
+// config; the connected wallet signs and pays it and is the creator. stonkfun lists it a minute or two later.
 
 type SolanaProvider = {
   isConnected?: boolean;
@@ -18,13 +18,13 @@ type Pair = { mint: string; symbol: string; name: string; logo: string | null; c
 
 type Launch = {
   id: string;
-  status: "prepared" | "submitted" | "completed" | "failed";
+  status: "building" | "prepared" | "submitted" | "completed" | "failed";
   wallet: string;
   handle: string | null;
   symbol: string;
-  costLamports: number;
-  launchSig: string | null;
   mint: string | null;
+  signature: string | null;
+  listed: boolean;
   error: string | null;
 };
 
@@ -62,7 +62,6 @@ function decode(b64: string): Transaction | VersionedTransaction {
     return Transaction.from(bytes);
   }
 }
-const sol = (lamports: number) => `${(lamports / 1e9).toLocaleString("en-US", { maximumFractionDigits: 5 })} SOL`;
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
@@ -115,11 +114,12 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
     if (polling.current) return;
     polling.current = true;
     try {
-      for (let i = 0; i < 100; i++) {
+      // Confirmation takes seconds; stonkfun lists an adopted pool within a couple of minutes.
+      for (let i = 0; i < 80; i++) {
         await new Promise((r) => setTimeout(r, 3000));
         const l = await api<Launch>(`/api/launch/${id}`);
         setLaunch(l);
-        if (l.status === "completed" || l.status === "failed") return;
+        if (l.status === "failed" || (l.status === "completed" && l.listed)) return;
       }
     } catch (e) {
       setError((e as Error).message);
@@ -137,7 +137,7 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
     setError(null);
     setLaunch(null);
     try {
-      setStep(`Preparing the launch on ${launchpad}…`);
+      setStep("Building the launch…");
       const prepared = await api<Launch & { transaction: string }>("/api/launch/prepare", {
         wallet,
         handle: get("handle"),
@@ -150,13 +150,13 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
         website: get("website"),
         telegram: get("telegram"),
       });
-      setStep(`Approve in ${provider.name}: about ${sol(prepared.costLamports)} goes to ${launchpad} for the launch.`);
+      setStep(`Approve in ${provider.name}. Your wallet shows the exact cost.`);
       const signed = await provider.p.signTransaction(decode(prepared.transaction));
       const bytes = signed instanceof VersionedTransaction ? signed.serialize() : signed.serialize({ requireAllSignatures: false });
-      setStep("Launching…");
+      setStep("Sending to Solana…");
       const l = await api<Launch>("/api/launch/submit", { id: prepared.id, signedTransaction: toBase64(bytes) });
       setLaunch(l);
-      if (l.status === "submitted") void poll(l.id);
+      if (l.status === "submitted" || l.status === "completed") void poll(l.id);
     } catch (e) {
       setError((e as Error).message || "Launch failed.");
     } finally {
@@ -176,14 +176,17 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
           <a href={`${explorerUrl}/token/${launch.mint}`} target="_blank" rel="noreferrer">
             View on explorer
           </a>
-          {launch.launchSig && (
+          {launch.signature && (
             <>
               {" · "}
-              <a href={`${explorerUrl}/tx/${launch.launchSig}`} target="_blank" rel="noreferrer">
+              <a href={`${explorerUrl}/tx/${launch.signature}`} target="_blank" rel="noreferrer">
                 Launch transaction
               </a>
             </>
           )}
+        </p>
+        <p className={launch.listed ? "" : "muted"}>
+          {launch.listed ? `Listed on ${launchpad}.` : `Waiting for ${launchpad} to list it (usually a minute or two)…`}
         </p>
         <p className="muted">
           Creator fees from trading go to your wallet ({short(launch.wallet)}).
@@ -290,15 +293,15 @@ export function LaunchForm({ launchpad, explorerUrl, ownHandle }: { launchpad: s
 
       {error && <p className="notice error">{error}</p>}
       {step && <p className="notice">{step}</p>}
-      {launch?.status === "submitted" && <p className="notice">Launching on {launchpad}… this takes a few seconds.</p>}
+      {launch?.status === "submitted" && <p className="notice">Confirming on Solana…</p>}
       {launch?.status === "failed" && <p className="notice error">{launch.error ?? "The launch failed."}</p>}
 
       <button className="btn" type="submit" disabled={busy || !wallet}>
         {busy ? "Working…" : wallet ? `Launch on ${launchpad}` : "Connect a wallet to launch"}
       </button>
       <p className="muted" style={{ fontSize: 13 }}>
-        You pay {launchpad}&apos;s own launch fee from your wallet; {ownHandle ? `@${ownHandle}` : "this site"} adds nothing on top.
-        Your wallet shows the exact amount before you approve.
+        Your wallet pays the network and account costs of the launch; {ownHandle ? `@${ownHandle}` : "this site"} adds nothing on
+        top. Your wallet shows the exact amount before you approve.
       </p>
     </form>
   );

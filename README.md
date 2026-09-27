@@ -219,23 +219,25 @@ RPC refuses are split in half until they fit.
 
 ## Launching from the site
 
-`/launch` has a form that launches a coin on stonkfun.xyz through its public Developer API
-([`lib/stonkfun.ts`](lib/stonkfun.ts), [`lib/launcher.ts`](lib/launcher.ts)). It is non-custodial: the server never holds a
-key or funds.
+`/launch` has a form that launches a stonkfun.xyz coin from this site. stonkfun's own launch endpoint is off; its
+Developer API says to build Raydium LaunchLab's `initialize_with_token_2022` against a StonkFun platform config, and
+stonkfun adopts every pool carrying its platform id within a minute or two. That is what
+[`lib/launchlab.ts`](lib/launchlab.ts) does. It is non-custodial: the server never holds a user key or funds.
 
-1. The browser connects Phantom, Solflare or Backpack and sends the form to `POST /api/launch/prepare`.
-2. The server validates it (bio gets `fees @handle` when a handle is given) and calls stonkfun's `POST /launches/prepare`
-   for the user's wallet. It checks the returned payment transaction is paid by that wallet and records its cost.
-3. The wallet signs that transaction. `POST /api/launch/submit` accepts it only if its message is byte-for-byte the one that
-   was prepared and it carries the wallet's signature, then relays it to stonkfun's `POST /launches/submit`.
-4. The page polls `GET /api/launch/:id`, which asks stonkfun's `GET /launches/{paymentSignature}` until the mint is live.
+1. The browser connects Phantom, Solflare or Backpack and posts the form to `POST /api/launch/prepare`.
+2. The server validates it (the bio gets `fees @handle` when a handle is given), asks stonkfun's
+   `GET /launchlab/pricing` for its numbers, and reads from chain what StonkFun's platform allows: the platform config,
+   LaunchLab's config for the chosen pair, and the platform's curve-rule account. It builds the launch with the wallet
+   as payer and creator under StonkFun's standard platform (`4E876qZT…gZL7`), signed only by a fresh mint key.
+3. The wallet signs. `POST /api/launch/submit` accepts it only if its message is byte-for-byte the one that was built,
+   signed by that wallet and the mint, then sends it to Solana.
+4. The page polls `GET /api/launch/:id` until the transaction is confirmed and stonkfun's `GET /tokens/{mint}` lists it.
 
-The user pays stonkfun's own launch fee; nothing is added. The launching wallet is the stonkfun creator, so its creator fees
-go to that wallet. To route fees to an X account through LongPaid's 80/20 split, launch with the fees going to
-`LONGPAID_FEE_WALLET` as described on the same page.
-
-stonkfun's request field names come from its public docs; they are all in `lib/stonkfun.ts`, and stonkfun's own error
-messages are shown on the form unchanged. Set `LAUNCH_ON_SITE=0` to hide the form.
+The token's metadata is served by this site at `/api/launch/:id/metadata` (uploaded logos at `/api/launch/:id/image`),
+so keep the site on a stable domain. The user pays the network and account costs; nothing is added. The launching
+wallet is the pool creator, so its creator fees go to that wallet. To route fees to an X account through LongPaid's
+80/20 split, launch with the fees going to `LONGPAID_FEE_WALLET` as described on the same page. Set `LAUNCH_ON_SITE=0`
+to hide the form.
 
 ## X Money payouts
 

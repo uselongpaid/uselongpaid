@@ -3,7 +3,7 @@ import { jsonError, launcher, publicLaunch } from "@/lib/launch-api.ts";
 
 export const dynamic = "force-dynamic";
 
-/** Current state of a launch; asks stonkfun when it's still in flight. */
+/** Current state of a launch: confirmed on Solana, then listed on stonkfun. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const row = await launcher().refresh((await params).id);

@@ -1,36 +1,15 @@
-// Client for stonkfun.xyz's public Developer API (https://www.stonkfun.xyz/developers). No API key: a launch is
-// authorised by the creator wallet's signature on the fee payment.
+// Client for stonkfun.xyz's public Developer API (https://www.stonkfun.xyz/developers). No API key.
 //
-//   GET  /pairs?launchable=true          quote assets a launch can pair against
-//   POST /launches/prepare               checks the launch, returns a signed quote + an unsigned payment transaction
-//   POST /launches/submit                takes the signed payment back and lands the launch as one bundle
-//   GET  /launches/{paymentSignature}    status until it's completed, with the new mint
+//   GET /pairs?launchable=true              quote assets a launch can pair against
+//   GET /launchlab/pricing?quoteMint=…      the numbers that go in LaunchLab's create instruction
+//   GET /tokens/{mint}                      a token stonkfun has picked up (adopted)
 //
-// The request field names below follow the public docs as far as they could be read. Everything that depends on them
-// lives in this file; stonkfun's own error message is passed through unchanged so a mismatch is obvious.
+// stonkfun's own launch endpoint is off; launches are built on Raydium LaunchLab (lib/launchlab.ts) and stonkfun
+// adopts them. Response shapes are read loosely and stonkfun's error messages are passed through unchanged.
+
+import type { PricingHints } from "./launchlab.ts";
 
 export type Pair = { mint: string; symbol: string; name: string; logo: string | null; category: string | null };
-
-export type LaunchInput = {
-  name: string;
-  symbol: string;
-  description: string;
-  image: string;
-  quoteMint: string;
-  twitter?: string;
-  website?: string;
-  telegram?: string;
-};
-
-export type Prepared = {
-  /** base64 unsigned payment transaction, to be signed by the creator wallet. */
-  transaction: string;
-  /** Everything else stonkfun returned (the signed quote, ids), sent back on submit. */
-  quote: unknown;
-  raw: Record<string, unknown>;
-};
-
-export type LaunchStatus = { state: "processing" | "completed" | "failed"; mint: string | null; message: string | null; raw: unknown };
 
 type Fetch = typeof fetch;
 
@@ -44,14 +23,22 @@ export class StonkfunError extends Error {
   }
 }
 
-const TX_KEYS = ["transaction", "paymentTransaction", "unsignedTransaction", "tx", "serializedTransaction"];
-const MINT_KEYS = ["mint", "tokenMint", "baseMint", "mintAddress", "tokenAddress"];
-
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** First string under one of `keys`, searching nested objects breadth-first. */
+/** First value under one of `keys`, searching nested objects breadth-first. */
+export function findValue(v: unknown, keys: string[]): unknown {
+  const queue: unknown[] = [v];
+  while (queue.length) {
+    const cur = queue.shift();
+    if (!isObj(cur)) continue;
+    for (const k of keys) if (cur[k] !== undefined && cur[k] !== null && cur[k] !== "") return cur[k];
+    for (const val of Object.values(cur)) if (isObj(val)) queue.push(val);
+  }
+  return undefined;
+}
+
 export function findString(v: unknown, keys: string[]): string | null {
   const queue: unknown[] = [v];
   while (queue.length) {
@@ -69,6 +56,8 @@ function list(v: unknown): unknown[] {
   return [];
 }
 
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
 export class StonkfunClient {
   private base: string;
   private fetchImpl: Fetch;
@@ -78,19 +67,15 @@ export class StonkfunClient {
     this.fetchImpl = fetchImpl;
   }
 
-  private async call(path: string, init?: RequestInit): Promise<unknown> {
-    const res = await this.fetchImpl(this.base + path, {
-      ...init,
-      headers: { accept: "application/json", ...(init?.body ? { "content-type": "application/json" } : {}), ...init?.headers },
-      signal: init?.signal ?? AbortSignal.timeout(30_000),
-    });
+  private async call(path: string): Promise<unknown> {
+    const res = await this.fetchImpl(this.base + path, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(20_000) });
     const text = await res.text();
     let body: unknown = text;
     try {
       body = JSON.parse(text);
     } catch {}
     if (!res.ok) {
-      const msg = (isObj(body) && (findString(body, ["message", "error", "detail", "reason"]) ?? null)) || text.slice(0, 300) || res.statusText;
+      const msg = (isObj(body) && findString(body, ["message", "error", "detail", "reason"])) || text.slice(0, 300) || res.statusText;
       throw new StonkfunError(`stonkfun ${res.status}: ${msg}`, res.status, body);
     }
     return body;
@@ -102,7 +87,7 @@ export class StonkfunClient {
       if (!isObj(p)) continue;
       const mint = findString(p, ["quoteMint", "mint", "address"]);
       const symbol = findString(p, ["symbol", "ticker"]);
-      if (!mint || !symbol) continue;
+      if (!mint || !symbol || !BASE58.test(mint)) continue;
       out.push({
         mint,
         symbol,
@@ -114,39 +99,35 @@ export class StonkfunClient {
     return out;
   }
 
-  async prepare(wallet: string, input: LaunchInput, requestId: string): Promise<Prepared> {
-    const body: Record<string, unknown> = {
-      wallet,
-      name: input.name,
-      symbol: input.symbol,
-      description: input.description,
-      image: input.image,
-      quoteMint: input.quoteMint,
-      requestId,
+  /** stonkfun's suggested curve numbers for a pair; empty when it has none. */
+  async pricing(quoteMint: string): Promise<PricingHints> {
+    const raw = await this.call(`/launchlab/pricing?quoteMint=${encodeURIComponent(quoteMint)}`);
+    const num = (keys: string[]): bigint | undefined => {
+      const v = findValue(raw, keys);
+      if (typeof v === "number" && Number.isSafeInteger(v) && v > 0) return BigInt(v);
+      if (typeof v === "string" && /^\d+$/.test(v) && v !== "0") return BigInt(v);
+      return undefined;
     };
-    for (const k of ["twitter", "website", "telegram"] as const) if (input[k]) body[k] = input[k];
-    const raw = await this.call("/launches/prepare", { method: "POST", body: JSON.stringify(body) });
-    if (!isObj(raw)) throw new StonkfunError("stonkfun returned an unexpected prepare response", 502, raw);
-    const transaction = findString(raw, TX_KEYS);
-    if (!transaction) throw new StonkfunError("stonkfun's prepare response has no payment transaction", 502, raw);
-    return { transaction, quote: raw.quote ?? raw.signedQuote ?? null, raw };
+    const out: PricingHints = {};
+    const supply = num(["supply", "supplyInit", "totalSupply"]);
+    const totalSellA = num(["totalSellA", "sellA", "totalSell"]);
+    const raise = num(["totalFundRaisingB", "totalFundRaising", "raise", "fundRaising"]);
+    if (supply) out.supply = supply;
+    if (totalSellA) out.totalSellA = totalSellA;
+    if (raise) out.totalFundRaisingB = raise;
+    const configId = findString(raw, ["configId", "globalConfig"]);
+    if (configId && BASE58.test(configId)) out.configId = configId;
+    return out;
   }
 
-  async submit(prepared: Prepared, signedTransaction: string): Promise<LaunchStatus> {
-    const body: Record<string, unknown> = { signedTransaction };
-    if (prepared.quote !== null) body.quote = prepared.quote;
-    return this.status(await this.call("/launches/submit", { method: "POST", body: JSON.stringify(body) }));
-  }
-
-  async launch(paymentSignature: string): Promise<LaunchStatus> {
-    return this.status(await this.call(`/launches/${encodeURIComponent(paymentSignature)}`));
-  }
-
-  private status(raw: unknown): LaunchStatus {
-    const s = (findString(raw, ["status", "state"]) ?? "").toLowerCase();
-    const mint = findString(raw, MINT_KEYS);
-    const message = findString(raw, ["error", "message", "reason"]);
-    const state = /fail|error|reject|expired|dropped/.test(s) ? "failed" : /complete|success|landed|done|live/.test(s) || (mint && !s) ? "completed" : "processing";
-    return { state, mint: state === "completed" ? mint : null, message, raw };
+  /** True once stonkfun lists the token (adopted from LaunchLab). */
+  async listed(mint: string): Promise<boolean> {
+    try {
+      await this.call(`/tokens/${encodeURIComponent(mint)}`);
+      return true;
+    } catch (e) {
+      if (e instanceof StonkfunError && e.status === 404) return false;
+      throw e;
+    }
   }
 }

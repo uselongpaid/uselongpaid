@@ -1,18 +1,21 @@
-// Launching on stonkfun.xyz from this site. The user's own wallet is the stonkfun creator: it signs and pays the
-// launch fee itself, and its creator fees go to that wallet. The server never holds a key or funds; it relays the
-// launch to stonkfun's API and remembers it so the page can show progress.
+// Launching a stonkfun.xyz coin from this site. stonkfun's own launch endpoint is off, so the launch is built on
+// Raydium LaunchLab under StonkFun's platform config and stonkfun adopts it within a minute or two.
 //
-// prepared → submitted → completed
-//          ↘ failed
+// The user's wallet pays, signs and is the creator, so its creator fees go to that wallet. The server builds the
+// transaction (signed only by the throwaway mint key), relays the wallet-signed copy to Solana, and serves the
+// token's metadata. It never holds a user key or funds.
+//
+// building → prepared → submitted → completed (then `listed` once stonkfun has adopted it)
+//                                  ↘ failed
 
 import { randomUUID } from "node:crypto";
-import { PublicKey, type Transaction, type VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, type VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { type Db } from "./db.ts";
 import { normalizeHandle } from "./handle.ts";
 import { isSolanaAddress } from "./address.ts";
-import { decodeTx, feePayer, lamportsOut, messageBytes, signedBy } from "./solana/tx.ts";
-import { type LaunchInput, type LaunchStatus, type Prepared, StonkfunError } from "./stonkfun.ts";
+import { decodeTx, messageBytes, signedBy } from "./solana/tx.ts";
+import type { BuiltLaunch, PricingHints } from "./launchlab.ts";
 
 export type LaunchRow = {
   id: string;
@@ -20,21 +23,31 @@ export type LaunchRow = {
   handle: string | null;
   name: string;
   symbol: string;
+  description: string;
+  image: string;
+  socials: string;
   quote_mint: string;
-  cost_lamports: number;
-  prepared: string;
-  status: "prepared" | "submitted" | "completed" | "failed";
-  launch_sig: string | null;
   mint: string | null;
+  pool: string | null;
+  tx: string | null;
+  status: "building" | "prepared" | "submitted" | "completed" | "failed";
+  signature: string | null;
+  listed: number;
   error: string | null;
   created_at: number;
   updated_at: number;
 };
 
-export interface Stonkfun {
-  prepare(wallet: string, input: LaunchInput, requestId: string): Promise<Prepared>;
-  submit(prepared: Prepared, signedTransaction: string): Promise<LaunchStatus>;
-  launch(paymentSignature: string): Promise<LaunchStatus>;
+export type BuildArgs = { wallet: PublicKey; quoteMint: PublicKey; name: string; symbol: string; uri: string; hints: PricingHints };
+
+export interface LaunchDeps {
+  db: Db;
+  build(args: BuildArgs): Promise<BuiltLaunch>;
+  pricing(quoteMint: string): Promise<PricingHints>;
+  listed(mint: string): Promise<boolean>;
+  send(raw: Uint8Array): Promise<string>;
+  status(signature: string): Promise<"confirmed" | "failed" | "pending">;
+  now?: () => number;
 }
 
 export class LaunchError extends Error {}
@@ -52,12 +65,22 @@ export type LaunchForm = {
   telegram?: string;
 };
 
+export type LaunchFields = {
+  handle: string | null;
+  name: string;
+  symbol: string;
+  description: string;
+  image: string;
+  quoteMint: string;
+  socials: { twitter?: string; website?: string; telegram?: string };
+};
+
 const URL_RE = /^https:\/\/[^\s]{3,300}$/;
-/** stonkfun's prepared transaction carries a live blockhash; it can't be submitted after this. */
+/** The blockhash in a built transaction is only good for about this long. */
 const PREPARED_TTL_MS = 90_000;
 
-/** Validates the form and turns it into what stonkfun receives. With a handle, the bio ends with "fees @handle". */
-export function launchInput(f: LaunchForm): { handle: string | null; input: LaunchInput } {
+/** Validates the form. With a handle, the description ends with "fees @handle". */
+export function launchFields(f: LaunchForm): LaunchFields {
   let handle: string | null = null;
   if ((f.handle ?? "").trim()) {
     handle = normalizeHandle(f.handle!);
@@ -77,137 +100,135 @@ export function launchInput(f: LaunchForm): { handle: string | null; input: Laun
   if (handle) bio = bio.replace(/\s*fees?\s*(?:to|send)?\s*:?\s*@\w+\s*$/i, "");
   if (bio.length > 400) throw new LaunchError("Description must be under 400 characters.");
   const description = handle ? `${bio ? `${bio}\n\n` : ""}fees @${handle}` : bio;
-  const input: LaunchInput = { name, symbol, description, image, quoteMint: f.quoteMint };
+  const socials: LaunchFields["socials"] = {};
   for (const k of ["twitter", "website", "telegram"] as const) {
     const v = (f[k] ?? "").trim();
     if (!v) continue;
     if (!URL_RE.test(v)) throw new LaunchError(`${k[0].toUpperCase() + k.slice(1)} must be an https:// link.`);
-    input[k] = v;
+    socials[k] = v;
   }
-  return { handle, input };
+  return { handle, name, symbol, description, image, quoteMint: f.quoteMint, socials };
 }
 
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  return a.length === b.length && a.every((x, i) => x === b[i]);
+/** The token metadata JSON that the mint's URI points at. */
+export function metadataJson(r: LaunchRow, imageUrl: string) {
+  const socials = JSON.parse(r.socials) as LaunchFields["socials"];
+  return {
+    name: r.name,
+    symbol: r.symbol,
+    description: r.description,
+    image: imageUrl,
+    ...(socials.twitter ? { twitter: socials.twitter } : {}),
+    ...(socials.website ? { website: socials.website } : {}),
+    ...(socials.telegram ? { telegram: socials.telegram } : {}),
+  };
 }
 
-function paymentSignature(tx: VersionedTransaction | Transaction): string | null {
-  const s = "version" in tx ? tx.signatures[0] : tx.signature;
-  return s && s.some((b) => b !== 0) ? bs58.encode(s) : null;
-}
+const bytesEqual = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 export class Launcher {
-  private db: Db;
-  private stonkfun: Stonkfun;
+  private d: LaunchDeps;
   private now: () => number;
 
-  constructor(db: Db, stonkfun: Stonkfun, now?: () => number) {
-    this.db = db;
-    this.stonkfun = stonkfun;
-    this.now = now ?? Date.now;
+  constructor(deps: LaunchDeps) {
+    this.d = deps;
+    this.now = deps.now ?? Date.now;
   }
 
   get(id: string): LaunchRow | null {
-    return (this.db.prepare("SELECT * FROM launch_requests WHERE id = ?").get(id) as LaunchRow | undefined) ?? null;
+    return (this.d.db.prepare("SELECT * FROM site_launches WHERE id = ?").get(id) as LaunchRow | undefined) ?? null;
   }
 
   private set(id: string, fields: Partial<LaunchRow>, whereStatus?: LaunchRow["status"]): boolean {
     const keys = Object.keys(fields);
-    const sql = `UPDATE launch_requests SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?${whereStatus ? " AND status = ?" : ""}`;
+    const sql = `UPDATE site_launches SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?${whereStatus ? " AND status = ?" : ""}`;
     const args = [...keys.map((k) => (fields as Record<string, unknown>)[k] as string | number | null), this.now(), id];
     if (whereStatus) args.push(whereStatus);
-    return Number(this.db.prepare(sql).run(...args).changes) === 1;
+    return Number(this.d.db.prepare(sql).run(...args).changes) === 1;
   }
 
   /**
-   * Asks stonkfun to prepare a launch for the user's wallet. Returns the unsigned payment transaction for the wallet
-   * to sign, and what it will cost that wallet.
+   * Builds the launch transaction for the user's wallet. `metadataUrl(id)` is where this site will serve the token's
+   * metadata. Returns the transaction for the wallet to sign.
    */
-  async prepare(form: LaunchForm): Promise<{ row: LaunchRow; transaction: string }> {
+  async prepare(form: LaunchForm, metadataUrl: (id: string) => string): Promise<{ row: LaunchRow; transaction: string }> {
     if (!isSolanaAddress(form.wallet ?? "")) throw new LaunchError("Connect a Solana wallet first.");
     const wallet = new PublicKey(form.wallet);
-    const { handle, input } = launchInput(form);
+    const f = launchFields(form);
     const id = randomUUID();
-    const prepared = await this.stonkfun.prepare(wallet.toBase58(), input, id);
-    const tx = decodeTx(prepared.transaction);
-    if (!feePayer(tx)?.equals(wallet)) throw new LaunchError("stonkfun prepared the launch for a different wallet.");
     const t = this.now();
-    this.db
+    this.d.db
       .prepare(
-        `INSERT INTO launch_requests (id, wallet, handle, name, symbol, quote_mint, cost_lamports, prepared, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?)`,
+        `INSERT INTO site_launches (id, wallet, handle, name, symbol, description, image, socials, quote_mint, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'building', ?, ?)`,
       )
-      .run(id, wallet.toBase58(), handle, input.name, input.symbol, input.quoteMint, Number(lamportsOut(tx, wallet)), JSON.stringify(prepared), t, t);
-    return { row: this.get(id)!, transaction: prepared.transaction };
+      .run(id, wallet.toBase58(), f.handle, f.name, f.symbol, f.description, f.image, JSON.stringify(f.socials), f.quoteMint, t, t);
+
+    let built: BuiltLaunch;
+    try {
+      const hints = await this.d.pricing(f.quoteMint).catch(() => ({}) as PricingHints);
+      built = await this.d.build({ wallet, quoteMint: new PublicKey(f.quoteMint), name: f.name, symbol: f.symbol, uri: metadataUrl(id), hints });
+    } catch (e) {
+      this.set(id, { status: "failed", error: (e as Error).message });
+      throw new LaunchError((e as Error).message);
+    }
+    const transaction = Buffer.from(built.tx.serialize()).toString("base64");
+    this.set(id, { status: "prepared", mint: built.mint.toBase58(), pool: built.pool.toBase58(), tx: transaction }, "building");
+    return { row: this.get(id)!, transaction };
   }
 
-  /**
-   * Relays the wallet-signed payment to stonkfun. Only the exact transaction that was prepared, signed by the wallet
-   * it was prepared for, is accepted.
-   */
+  /** Relays the wallet-signed launch to Solana: only the exact transaction that was built, signed by that wallet. */
   async submit(id: string, signedTransaction: string): Promise<LaunchRow> {
     const row = this.get(id);
     if (!row) throw new LaunchError("Launch not found.");
-    if (row.status !== "prepared") return row;
+    if (row.status !== "prepared" || !row.tx) return row;
     if (this.now() - row.created_at > PREPARED_TTL_MS) {
-      this.set(id, { status: "failed", error: "The signature came too late; the prepared launch expired. Nothing was charged." }, "prepared");
+      this.set(id, { status: "failed", error: "The signature came too late and the transaction expired. Nothing was charged; try again." }, "prepared");
       return this.get(id)!;
     }
-    const prepared = JSON.parse(row.prepared) as Prepared;
-    let signed: VersionedTransaction | Transaction;
+    let signed: VersionedTransaction;
     try {
-      signed = decodeTx(signedTransaction);
+      const tx = decodeTx(signedTransaction);
+      if (!("version" in tx)) throw new Error();
+      signed = tx;
     } catch {
-      throw new LaunchError("That isn't a Solana transaction.");
+      throw new LaunchError("That isn't the launch transaction.");
     }
-    if (!bytesEqual(messageBytes(signed), messageBytes(decodeTx(prepared.transaction)))) {
-      throw new LaunchError("The signed transaction isn't the one that was prepared.");
-    }
+    const built = decodeTx(row.tx) as VersionedTransaction;
+    if (!bytesEqual(messageBytes(signed), messageBytes(built))) throw new LaunchError("The signed transaction isn't the one that was built.");
     if (!signedBy(signed, new PublicKey(row.wallet))) throw new LaunchError("The wallet didn't sign the launch.");
-    const sig = paymentSignature(signed);
+    if (!signedBy(signed, new PublicKey(row.mint!))) throw new LaunchError("The mint signature is missing; start again.");
+
+    const sig = bs58.encode(signed.signatures[0]);
     try {
-      if (!this.set(id, { status: "submitted", launch_sig: sig }, "prepared")) return this.get(id)!;
+      if (!this.set(id, { status: "submitted", signature: sig, error: null }, "prepared")) return this.get(id)!;
     } catch {
-      throw new LaunchError("That signed launch was already submitted.");
+      throw new LaunchError("That launch was already sent.");
     }
     try {
-      return this.apply(id, await this.stonkfun.submit(prepared, signedTransaction));
+      await this.d.send(signed.serialize());
     } catch (e) {
-      if (e instanceof StonkfunError && e.status >= 400 && e.status < 500) {
-        this.set(id, { status: "failed", error: `stonkfun rejected the launch: ${e.message}` });
-      } else {
-        // Unknown whether it landed; polling the payment signature settles it.
-        this.set(id, { error: (e as Error).message });
-      }
-      return this.get(id)!;
-    }
-  }
-
-  /** Polls stonkfun for a submitted launch. */
-  async refresh(id: string): Promise<LaunchRow | null> {
-    const row = this.get(id);
-    if (!row || row.status !== "submitted" || !row.launch_sig) return row;
-    try {
-      return this.apply(id, await this.stonkfun.launch(row.launch_sig));
-    } catch (e) {
-      if (this.now() - row.updated_at > 15 * 60_000) this.set(id, { status: "failed", error: `No result from stonkfun: ${(e as Error).message}` });
-      return this.get(id);
-    }
-  }
-
-  private apply(id: string, st: LaunchStatus): LaunchRow {
-    const row = this.get(id)!;
-    if (st.state === "failed") {
-      this.set(id, { status: "failed", error: `stonkfun: ${st.message ?? "launch failed"}` }, "submitted");
-    } else if (st.state === "completed" && st.mint && isSolanaAddress(st.mint)) {
-      this.set(id, { status: "completed", mint: st.mint, error: null }, "submitted");
-    } else if (this.now() - row.updated_at > 15 * 60_000) {
-      this.set(id, { status: "failed", error: "stonkfun didn't finish the launch in 15 minutes. Check your wallet." }, "submitted");
+      this.set(id, { status: "failed", error: `Solana rejected the launch: ${(e as Error).message}` }, "submitted");
     }
     return this.get(id)!;
   }
 
+  /** Moves a sent launch forward: confirmed on Solana, then listed on stonkfun. */
+  async refresh(id: string): Promise<LaunchRow | null> {
+    const row = this.get(id);
+    if (!row) return null;
+    if (row.status === "submitted" && row.signature) {
+      const st = await this.d.status(row.signature).catch(() => "pending" as const);
+      if (st === "confirmed") this.set(id, { status: "completed" }, "submitted");
+      else if (st === "failed") this.set(id, { status: "failed", error: "The launch transaction failed on Solana. Only the network fee was spent." }, "submitted");
+      else if (this.now() - row.updated_at > 3 * 60_000) this.set(id, { status: "failed", error: "The launch didn't land on Solana. Check your wallet before trying again." }, "submitted");
+    }
+    const cur = this.get(id)!;
+    if (cur.status === "completed" && !cur.listed && cur.mint && (await this.d.listed(cur.mint).catch(() => false))) this.set(id, { listed: 1 });
+    return this.get(id);
+  }
+
   recent(limit = 30): LaunchRow[] {
-    return this.db.prepare("SELECT * FROM launch_requests WHERE status != 'prepared' ORDER BY created_at DESC LIMIT ?").all(limit) as LaunchRow[];
+    return this.d.db.prepare("SELECT * FROM site_launches WHERE status IN ('submitted','completed') ORDER BY created_at DESC LIMIT ?").all(limit) as LaunchRow[];
   }
 }
