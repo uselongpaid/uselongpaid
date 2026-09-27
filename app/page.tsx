@@ -8,6 +8,7 @@ import { Lookup } from "@/components/Lookup.tsx";
 import { LiveStats } from "@/components/LiveStats.tsx";
 import { FeesChart } from "@/components/FeesChart.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
+import { FeeFlow } from "@/components/FeeFlow.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -135,6 +136,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
             )}
           </div>
         </div>
+      </section>
+
+      <section>
+        <h2>Where the fees go</h2>
+        <FeeFlow share={share} handle={config.detect.handle || "longpaid"} />
       </section>
 
       <section className="two-col">

@@ -277,3 +277,33 @@ form.inline input { min-width: 0; flex: 1; font-size: 13px; }
   nav.links { width: auto; flex: 1; justify-content: flex-start; gap: 16px; }
 }
 .inline-copy { display: flex; align-items: center; gap: 8px; }
+
+/* --- fee flow diagram --- */
+.feeflow { border: 1px solid var(--border); border-radius: 20px; background: linear-gradient(180deg, #0e0e0e, #080808); padding: 12px 8px; }
+.feeflow-svg { display: block; width: 100%; height: auto; }
+.ff-lines path { fill: none; stroke: #2e2e2e; stroke-width: 2; }
+.ff-lines .ff-main { stroke: #3d3d3d; }
+.ff-lines .ff-burn { stroke: rgba(245, 158, 75, 0.35); }
+.ff-flow path { fill: none; stroke: var(--text); stroke-width: 2; stroke-dasharray: 6 18; opacity: .55; animation: ff-dash 1.6s linear infinite; }
+.ff-flow .ff-flow-burn { stroke: var(--burn); }
+@keyframes ff-dash { to { stroke-dashoffset: -24; } }
+@media (prefers-reduced-motion: reduce) { .ff-flow path { animation: none; opacity: 0; } }
+.ff-ring { fill: none; stroke: #262626; stroke-width: 1.5; }
+.ff-core { fill: #0b0b0b; stroke: #d4d4d4; stroke-width: 2; }
+.ff-icon { color: var(--text); }
+.ff-hot .ff-core { stroke: #ffffff; }
+.ff-hot .ff-ring { stroke: #4a4a4a; }
+.ff-burn .ff-core { stroke: var(--burn); }
+.ff-burn .ff-icon { color: var(--burn); }
+.ff-label { fill: var(--muted); font-size: 15px; text-anchor: middle; font-family: inherit; }
+.ff-pct { fill: var(--text); font-size: 17px; font-weight: 700; font-family: inherit; }
+.ff-pct-burn { fill: var(--burn); }
+.feeflow-list { display: none; list-style: none; margin: 0; padding: 8px; }
+.feeflow-list li { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.feeflow-list li:last-child { border-bottom: 0; }
+.ffl-icon { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 2px solid #d4d4d4; display: grid; place-items: center; color: var(--text); }
+.ffl-branch { padding-left: 20px !important; }
+.ffl-pct { flex: none; font-weight: 700; width: 38px; font-variant-numeric: tabular-nums; }
+.ffl-burn .ffl-icon { border-color: var(--burn); color: var(--burn); }
+.ffl-burn .ffl-pct { color: var(--burn); }
+@media (max-width: 700px) { .feeflow-svg { display: none; } .feeflow-list { display: block; } }
