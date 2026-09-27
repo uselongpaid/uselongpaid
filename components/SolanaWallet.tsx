@@ -4,37 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Transaction, VersionedTransaction } from "@solana/web3.js";
 
 // One Solana wallet connection for the whole site: the header button connects, switches and disconnects it, and the
-// launch form signs with whatever is connected. Phantom, Solflare and Backpack inject a provider on window.
+// launch form signs with whatever is connected. Any installed Solana wallet shows up (see walletDetect.ts).
+
+import { type DetectedWallet, INSTALL_LINKS, type SolanaProvider, detectWallets, watchWallets } from "./walletDetect.ts";
+
+export type { SolanaProvider } from "./walletDetect.ts";
 
 type PubKey = { toBase58(): string };
 type Listener = (...args: unknown[]) => void;
-
-export type SolanaProvider = {
-  publicKey?: PubKey | null;
-  connect(opts?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: PubKey } | void>;
-  disconnect?(): Promise<void>;
-  signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
-  on?(event: string, fn: Listener): void;
-  off?(event: string, fn: Listener): void;
-  removeListener?(event: string, fn: Listener): void;
-};
-
-declare global {
-  interface Window {
-    phantom?: { solana?: SolanaProvider };
-    solflare?: SolanaProvider;
-    backpack?: SolanaProvider;
-    solana?: SolanaProvider;
-  }
-}
-
-export type WalletOption = { name: string; url: string; get: () => SolanaProvider | undefined };
-
-export const WALLETS: WalletOption[] = [
-  { name: "Phantom", url: "https://phantom.com", get: () => window.phantom?.solana },
-  { name: "Solflare", url: "https://solflare.com", get: () => window.solflare },
-  { name: "Backpack", url: "https://backpack.app", get: () => window.backpack },
-];
 
 const STORAGE_KEY = "longpaid.wallet";
 
@@ -44,7 +21,8 @@ type Ctx = {
   provider: SolanaProvider | null;
   connecting: boolean;
   error: string | null;
-  installed: WalletOption[];
+  installed: DetectedWallet[];
+  rescan(): void;
   connect(name: string): Promise<void>;
   disconnect(): Promise<void>;
   menuOpen: boolean;
@@ -69,7 +47,8 @@ function remember(name: string | null) {
 }
 
 export function SolanaWalletProvider({ children }: { children: React.ReactNode }) {
-  const [installed, setInstalled] = useState<WalletOption[]>([]);
+  const [installed, setInstalled] = useState<DetectedWallet[]>([]);
+  const rescan = useCallback(() => setInstalled(detectWallets()), []);
   const [provider, setProvider] = useState<SolanaProvider | null>(null);
   const [walletName, setWalletName] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
@@ -106,35 +85,41 @@ export function SolanaWalletProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    // Wallet extensions inject after load in some browsers; look again shortly after.
-    const scan = () => setInstalled(WALLETS.filter((w) => w.get()));
-    scan();
-    const t = setTimeout(scan, 600);
-
     let saved: string | null = null;
     try {
       saved = localStorage.getItem(STORAGE_KEY);
     } catch {}
-    const w = WALLETS.find((x) => x.name === saved);
-    const p = w?.get();
-    // Reconnect silently only if the wallet already trusts this site.
-    if (w && p) {
-      p.connect({ onlyIfTrusted: true })
-        .then((r) => attach(w.name, p, r ? r.publicKey : p.publicKey))
-        .catch(() => remember(null));
-    }
+    let tried = false;
+    // Reconnect silently, once, as soon as the remembered wallet shows up, and only if it still trusts this site.
+    const scan = () => {
+      const list = detectWallets();
+      setInstalled(list);
+      const w = list.find((x) => x.name === saved);
+      if (w && !tried) {
+        tried = true;
+        w.provider
+          .connect({ onlyIfTrusted: true })
+          .then((r) => attach(w.name, w.provider, r ? r.publicKey : w.provider.publicKey))
+          .catch(() => {});
+      }
+    };
+    const stop = watchWallets(scan);
+    scan();
+    // Some extensions inject a little after the page loads.
+    const timers = [300, 1000, 2500].map((ms) => setTimeout(scan, ms));
     return () => {
-      clearTimeout(t);
+      stop();
+      timers.forEach(clearTimeout);
       detach.current?.();
     };
   }, [attach]);
 
   const connect = useCallback(
     async (name: string) => {
-      const w = WALLETS.find((x) => x.name === name);
-      const p = w?.get();
+      const w = detectWallets().find((x) => x.name === name);
+      const p = w?.provider;
       if (!w || !p) {
-        setError(`${name} isn't installed.`);
+        setError(`${name} isn't available in this browser.`);
         return;
       }
       setConnecting(true);
@@ -168,7 +153,7 @@ export function SolanaWalletProvider({ children }: { children: React.ReactNode }
   }, [provider]);
 
   return (
-    <WalletCtx.Provider value={{ address, walletName, provider, connecting, error, installed, connect, disconnect, menuOpen, setMenuOpen }}>
+    <WalletCtx.Provider value={{ address, walletName, provider, connecting, error, installed, rescan, connect, disconnect, menuOpen, setMenuOpen }}>
       {children}
     </WalletCtx.Provider>
   );
@@ -196,8 +181,14 @@ export function SolanaConnectButton() {
 
   function toggle() {
     setView(w.address ? "account" : "choose");
+    if (!w.menuOpen) w.rescan();
     w.setMenuOpen(!w.menuOpen);
   }
+
+  useEffect(() => {
+    if (w.menuOpen) w.rescan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [w.menuOpen]);
 
   async function copy() {
     if (!w.address) return;
@@ -250,20 +241,26 @@ export function SolanaConnectButton() {
               <div className="wallet-pop-head muted" style={{ fontSize: 13 }}>
                 {w.address ? "Switch to" : "Connect a Solana wallet"}
               </div>
-              {WALLETS.map((opt) => {
-                const has = w.installed.some((i) => i.name === opt.name);
-                const current = w.walletName === opt.name;
-                return has ? (
-                  <button key={opt.name} type="button" role="menuitem" disabled={w.connecting} onClick={() => w.connect(opt.name)}>
+              {w.installed.length ? (
+                w.installed.map((opt) => (
+                  <button key={opt.name} type="button" role="menuitem" className="wallet-opt" disabled={w.connecting} onClick={() => w.connect(opt.name)}>
+                    {opt.icon ? <img src={opt.icon} alt="" width={20} height={20} /> : <span className="wallet-opt-icon" />}
                     {opt.name}
-                    {current ? <span className="muted"> · pick another account</span> : null}
+                    {w.walletName === opt.name ? <span className="muted"> · pick another account</span> : null}
                   </button>
-                ) : (
-                  <a key={opt.name} role="menuitem" href={opt.url} target="_blank" rel="noreferrer" className="muted">
-                    {opt.name} <span style={{ fontSize: 12 }}>· install</span>
-                  </a>
-                );
-              })}
+                ))
+              ) : (
+                <>
+                  <div className="muted" style={{ fontSize: 13, padding: "6px 12px" }}>
+                    No Solana wallet found in this browser. On a phone, open this site in your wallet app&apos;s browser.
+                  </div>
+                  {INSTALL_LINKS.map((opt) => (
+                    <a key={opt.name} role="menuitem" href={opt.url} target="_blank" rel="noreferrer" className="muted">
+                      Get {opt.name}
+                    </a>
+                  ))}
+                </>
+              )}
               {w.error && <div className="field-error" style={{ padding: "6px 12px" }}>{w.error}</div>}
               {w.address && (
                 <button type="button" role="menuitem" onClick={() => setView("account")}>

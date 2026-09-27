@@ -362,3 +362,6 @@ form.inline input { min-width: 0; flex: 1; font-size: 13px; }
 .wallet-pop button:disabled { opacity: 0.5; cursor: default; }
 .wallet-pop .danger { color: var(--burn); }
 @media (max-width: 560px) { .wallet-pop { right: auto; left: auto; right: 0; } }
+.wallet-pop .wallet-opt { display: flex; align-items: center; gap: 10px; }
+.wallet-opt img, .wallet-opt-icon { width: 20px; height: 20px; border-radius: 6px; flex: none; }
+.wallet-opt-icon { background: var(--surface-2); border: 1px solid var(--border); }
