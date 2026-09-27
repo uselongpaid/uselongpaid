@@ -43,6 +43,12 @@ export const config = {
     /** A coin's page on the launchpad; {mint} is replaced. */
     tokenUrl: process.env.LAUNCHPAD_TOKEN_URL || "https://www.stonkfun.xyz/token/{mint}",
   },
+  /** LongPaid's own coin, shown with a live chart on the home page and its CA in the footer. Empty hides it. */
+  projectCoin: {
+    mint: (process.env.PROJECT_COIN_MINT ?? "AbyFpbzShnHTho4U8XzPiGRoqUeQiZLhoQeakw43uSZw").trim(),
+    /** Shown until DEX Screener returns the real ticker. */
+    symbol: (process.env.PROJECT_COIN_SYMBOL || "").replace(/^\$/, ""),
+  },
   /** Solana wallet that receives the creator fees of LongPaid tokens. Shown on /launch when set. */
   feeWallet: process.env.LONGPAID_FEE_WALLET || "",
   /** Solana JSON-RPC used to confirm claim transactions and read token names. */

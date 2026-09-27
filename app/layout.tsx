@@ -53,6 +53,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Launch on {config.launchpad.name}, send the fees to any X account. {config.recipientShareBps / 100}% paid out in dollars,{" "}
                 {100 - config.recipientShareBps / 100}% buyback and burn.
               </p>
+              {config.projectCoin.mint && (
+                <p className="footer-ca">
+                  <span className="copy-label">CA</span>{" "}
+                  <a className="mono" href="/#coin">
+                    {config.projectCoin.mint}
+                  </a>
+                </p>
+              )}
             </div>
             <div className="footer-links">
               <span className="copy-label">Product</span>

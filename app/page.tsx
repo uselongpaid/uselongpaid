@@ -10,6 +10,7 @@ import { FeesChart } from "@/components/FeesChart.tsx";
 import { XIcon } from "@/components/XIcon.tsx";
 import { FeeFlow } from "@/components/FeeFlow.tsx";
 import { CoinCard } from "@/components/CoinCard.tsx";
+import { ProjectCoin } from "@/components/ProjectCoin.tsx";
 import { listCoins } from "@/lib/coins.ts";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +109,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
       </div>
 
       <LiveStats initial={stats} />
+
+      {config.projectCoin.mint && (
+        <ProjectCoin
+          mint={config.projectCoin.mint}
+          fallbackSymbol={config.projectCoin.symbol}
+          tradeUrl={config.launchpad.tokenUrl.replace("{mint}", config.projectCoin.mint)}
+          explorerUrl={config.chain.explorerUrl}
+        />
+      )}
 
       <section>
         <h2>How it works</h2>

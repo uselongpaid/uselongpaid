@@ -365,3 +365,23 @@ form.inline input { min-width: 0; flex: 1; font-size: 13px; }
 .wallet-pop .wallet-opt { display: flex; align-items: center; gap: 10px; }
 .wallet-opt img, .wallet-opt-icon { width: 20px; height: 20px; border-radius: 6px; flex: none; }
 .wallet-opt-icon { background: var(--surface-2); border: 1px solid var(--border); }
+
+/* LongPaid's own coin on the home page */
+.project-coin { scroll-margin-top: 80px; }
+.project-coin-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.project-coin-title { display: flex; align-items: center; gap: 14px; }
+.project-coin-logo { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; border: 1px solid var(--border); }
+.project-coin-price { text-align: right; }
+.project-coin-big { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.project-coin-price .up { color: var(--ok); font-weight: 600; }
+.project-coin-price .down { color: var(--burn); font-weight: 600; }
+.project-coin-ca { align-items: center; gap: 10px; }
+.project-coin-ca code { overflow: hidden; text-overflow: ellipsis; }
+.project-coin .stats { margin: 16px 0; }
+.project-coin-empty { height: 460px; display: grid; place-items: center; text-align: center; padding: 24px; }
+.footer-ca { font-size: 12px; margin-top: 10px; word-break: break-all; }
+.footer-ca a { color: var(--muted); }
+@media (max-width: 700px) { .project-coin-price { text-align: left; } .project-coin-empty { height: 360px; } }
+.project-coin-ca { display: flex; }
+.project-coin-ca .copy-label { margin: 0; flex: none; }
+.project-coin-ca code { flex: 1; min-width: 0; text-align: left; white-space: nowrap; }
