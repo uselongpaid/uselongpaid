@@ -104,7 +104,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
 
       <LiveStats initial={stats} />
 
-
       <section>
         <h2>How it works</h2>
         <div className="steps">

@@ -1,6 +1,5 @@
 import { normalizeHandle } from "@/lib/handle.ts";
 import { redirectTo } from "@/lib/http.ts";
-import { config } from "@/lib/config.ts";
 
 export function GET(req: Request) {
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
