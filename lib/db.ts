@@ -173,8 +173,9 @@ export async function openDb(url: string, authToken?: string): Promise<Db> {
   const remote = /^(libsql|https?|wss?):\/\//i.test(u);
   if (!remote && (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME)) {
     throw new Error(
-      "DATABASE_URL isn't set to a hosted database. On Netlify set DATABASE_URL (libsql://…turso.io) and DATABASE_AUTH_TOKEN " +
-        "in Site configuration → Environment variables, then redeploy.",
+      (process.env.DATABASE_URL ? "DATABASE_URL is set but isn't a libsql:// Turso URL. " : "DATABASE_URL isn't visible to the app. ") +
+        "On Netlify set DATABASE_URL (libsql://…turso.io) and DATABASE_AUTH_TOKEN in Site configuration → Environment " +
+        "variables with the Functions scope, then redeploy.",
     );
   }
   if (u === ":memory:") u = `file:${join(tmpdir(), `longpaid-${randomUUID()}.db`)}`;

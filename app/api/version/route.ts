@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { config } from "@/lib/config.ts";
+import { config, databaseSettings } from "@/lib/config.ts";
 import { db } from "@/lib/server.ts";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +16,9 @@ export async function GET() {
   return NextResponse.json({
     app: config.appName,
     commit: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.COMMIT_REF || process.env.GIT_COMMIT_SHA || "unknown",
-    host: process.env.NETLIFY ? "netlify" : process.env.RAILWAY_ENVIRONMENT ? "railway" : "node",
+    host: process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME ? "netlify" : process.env.RAILWAY_ENVIRONMENT ? "railway" : "node",
     database,
+    databaseSettings: databaseSettings(),
     chainId: config.chain.id,
     node: process.version,
   });

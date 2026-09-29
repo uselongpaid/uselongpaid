@@ -9,12 +9,31 @@ function num(name: string, fallback: number): number {
   return n;
 }
 
+/** Tolerates pasted values: surrounding quotes/spaces, and a Turso host without its libsql:// scheme. */
+function cleanDbUrl(raw: string): string {
+  const v = raw.trim().replace(/^["']|["']$/g, "").trim();
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.turso\.io\/?$/i.test(v)) return `libsql://${v.replace(/\/$/, "")}`;
+  return v;
+}
+
+/** What the app sees of its database settings, without the secrets (for /api/version). */
+export function databaseSettings() {
+  const raw = process.env.DATABASE_URL ?? process.env.TURSO_DATABASE_URL;
+  const url = config.databaseUrl;
+  return {
+    urlSet: raw !== undefined && raw.trim() !== "",
+    kind: /^libsql:\/\//i.test(url) ? "turso" : /^https?:\/\//i.test(url) ? "http" : "local file",
+    host: /^(libsql|https?):\/\//i.test(url) ? new URL(url.replace(/^libsql:/i, "https:")).host : null,
+    tokenSet: config.databaseAuthToken !== "",
+  };
+}
+
 export const config = {
   appName: process.env.NEXT_PUBLIC_APP_NAME || "LongPaid",
   chain,
   /** libsql://… (Turso) in production, or a local SQLite file. DATABASE_PATH is the older name for a file path. */
-  databaseUrl: process.env.DATABASE_URL || process.env.DATABASE_PATH || "./data/longpaid.db",
-  databaseAuthToken: process.env.DATABASE_AUTH_TOKEN || "",
+  databaseUrl: cleanDbUrl(process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL || process.env.DATABASE_PATH || "") || "./data/longpaid.db",
+  databaseAuthToken: (process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || "").trim().replace(/^["']|["']$/g, ""),
   cronSecret: process.env.CRON_SECRET || "",
   recipientShareBps: num("RECIPIENT_SHARE_BPS", 8000),
   milestones: parseMilestones(process.env.PAYOUT_MILESTONES_USD, process.env.PAYOUT_MILESTONE_STEP_USD),
