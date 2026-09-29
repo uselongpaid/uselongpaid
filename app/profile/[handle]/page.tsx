@@ -15,9 +15,9 @@ export default async function Profile({ params }: { params: Promise<{ handle: st
   const handle = normalizeHandle(decodeURIComponent((await params).handle));
   if (!handle) notFound();
 
-  const d = db();
-  const account = getAccount(d, handle);
-  const earnings = earningsByToken(d, handle);
+  const d = await db();
+  const account = await getAccount(d, handle);
+  const earnings = await earningsByToken(d, handle);
   const next = nextMilestone(account?.milestone_micros ?? 0, config.milestones);
   const toMilestone = Math.max(0, next - (account?.lifetime_micros ?? 0));
 
@@ -99,11 +99,11 @@ export default async function Profile({ params }: { params: Promise<{ handle: st
       </section>
       <section>
         <h2>Payouts</h2>
-        <PayoutsTable rows={listPayouts(d, { handle, limit: 20 })} />
+        <PayoutsTable rows={await listPayouts(d, { handle, limit: 20 })} />
       </section>
       <section>
         <h2>Claims</h2>
-        <ClaimsTable rows={recentClaims(d, { handle, limit: 20 })} showHandle={false} />
+        <ClaimsTable rows={await recentClaims(d, { handle, limit: 20 })} showHandle={false} />
       </section>
     </>
   );

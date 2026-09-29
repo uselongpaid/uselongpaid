@@ -8,7 +8,7 @@ if (!config.detect.feeWallets.length) {
   console.error("Set LONGPAID_FEE_WALLETS to the wallet long.xyz pays LongPaid's fees to.");
   process.exit(1);
 }
-const report = await syncLaunches(openDb(config.databasePath), new ViemLaunchReader(config.long.rpcUrl, config.detect.factory), fetchMetadata, {
+const report = await syncLaunches(await openDb(config.databaseUrl, config.databaseAuthToken), new ViemLaunchReader(config.long.rpcUrl, config.detect.factory), fetchMetadata, {
   feeWallets: config.detect.feeWallets,
   excludeHandles: config.detect.handle ? [config.detect.handle] : [],
   chainId: config.chain.id,

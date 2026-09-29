@@ -10,7 +10,7 @@ if (config.feeSource !== "longxyz") {
   console.error("FEE_SOURCE is manual: record claims in /admin, and run `npm run distribute` to send payouts.");
   process.exit(1);
 }
-const report = await runClaimCycle(openDb(config.databasePath), new LongXyzFeeSource(config.long), createPayoutProvider(), {
+const report = await runClaimCycle(await openDb(config.databaseUrl, config.databaseAuthToken), new LongXyzFeeSource(config.long), createPayoutProvider(), {
   recipientShareBps: config.recipientShareBps,
   milestones: config.milestones,
 });

@@ -57,7 +57,7 @@ const MAX_CHUNK = 50_000n;
  */
 export async function syncLaunches(db: Db, reader: LaunchReader, fetchMeta: MetadataFetcher, opts: SyncOptions): Promise<SyncReport> {
   const head = await reader.head();
-  const saved = getKv(db, CURSOR);
+  const saved = await getKv(db, CURSOR);
   let from = saved !== null ? BigInt(saved) + 1n : (opts.startBlock ?? head);
   const report: SyncReport = {
     from: from.toString(),
@@ -100,7 +100,7 @@ export async function syncLaunches(db: Db, reader: LaunchReader, fetchMeta: Meta
         return report;
       }
     }
-    setKv(db, CURSOR, to.toString());
+    await setKv(db, CURSOR, to.toString());
     report.to = to.toString();
     from = to + 1n;
     if (chunk < MAX_CHUNK) chunk *= 2n;
@@ -112,11 +112,11 @@ export async function syncLaunches(db: Db, reader: LaunchReader, fetchMeta: Meta
 
 async function recordIfOurs(db: Db, reader: LaunchReader, l: LaunchedToken, opts: SyncOptions): Promise<boolean> {
   const asset = l.asset.toLowerCase();
-  if (db.prepare("SELECT 1 FROM detected_launches WHERE asset = ?").get(asset)) return true;
+  if (await db.prepare("SELECT 1 FROM detected_launches WHERE asset = ?").get(asset)) return true;
   const wallet = feeWalletInLaunch(await reader.launchInput(l.txHash), opts.feeWallets);
   if (!wallet) return false;
   const now = Date.now();
-  db.prepare(
+  await db.prepare(
     `INSERT INTO detected_launches (asset, tx_hash, block, launched_at, launcher, name, symbol, token_uri, fee_wallet, status, detected_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
   ).run(
@@ -142,7 +142,7 @@ export async function resolveAsset(db: Db, fetchMeta: MetadataFetcher, opts: Syn
   const report: SyncReport = { from: "0", to: "0", scanned: 0, routedToUs: 0, registered: [], needsHandle: [], caughtUp: true, errors: [] };
   const a = asset.toLowerCase();
   // Give a launch whose metadata was unreachable another round of attempts.
-  db.prepare("UPDATE detected_launches SET status = 'pending', attempts = 0, note = NULL WHERE asset = ? AND status = 'needs_handle' AND note = 'metadata unreachable'").run(a);
+  await db.prepare("UPDATE detected_launches SET status = 'pending', attempts = 0, note = NULL WHERE asset = ? AND status = 'needs_handle' AND note = 'metadata unreachable'").run(a);
   await resolvePending(db, fetchMeta, opts, report, a);
   return report;
 }
@@ -151,8 +151,8 @@ async function resolvePending(db: Db, fetchMeta: MetadataFetcher, opts: SyncOpti
   const maxAttempts = opts.maxMetadataAttempts ?? 5;
   const rows = (
     only
-      ? db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' AND asset = ?").all(only)
-      : db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' ORDER BY block LIMIT 100").all()
+      ? await db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' AND asset = ?").all(only)
+      : await db.prepare("SELECT * FROM detected_launches WHERE status = 'pending' ORDER BY block LIMIT 100").all()
   ) as Pending[];
   for (const r of rows) {
     let meta: TokenMetadata | null = null;
@@ -165,7 +165,7 @@ async function resolvePending(db: Db, fetchMeta: MetadataFetcher, opts: SyncOpti
     if (!meta) {
       const attempts = r.attempts + 1;
       const giveUp = attempts >= maxAttempts;
-      db.prepare("UPDATE detected_launches SET attempts = ?, status = ?, note = ?, updated_at = ? WHERE asset = ?").run(
+      await db.prepare("UPDATE detected_launches SET attempts = ?, status = ?, note = ?, updated_at = ? WHERE asset = ?").run(
         attempts,
         giveUp ? "needs_handle" : "pending",
         giveUp ? "metadata unreachable" : null,
@@ -177,7 +177,7 @@ async function resolvePending(db: Db, fetchMeta: MetadataFetcher, opts: SyncOpti
     }
     const handle = feeHandleFromMetadata(meta, opts.excludeHandles);
     if (!handle) {
-      db.prepare("UPDATE detected_launches SET status = 'needs_handle', note = ?, updated_at = ? WHERE asset = ?").run(
+      await db.prepare("UPDATE detected_launches SET status = 'needs_handle', note = ?, updated_at = ? WHERE asset = ?").run(
         "no 'fees @handle' in the bio",
         now,
         r.asset,
@@ -185,16 +185,16 @@ async function resolvePending(db: Db, fetchMeta: MetadataFetcher, opts: SyncOpti
       report.needsHandle.push({ asset: r.asset, symbol: r.symbol, reason: "no 'fees @handle' in the bio" });
       continue;
     }
-    registerDetected(db, r.asset, handle, opts.chainId, imageUrl(meta));
+    await registerDetected(db, r.asset, handle, opts.chainId, imageUrl(meta));
     report.registered.push({ asset: r.asset, symbol: r.symbol, handle });
   }
 }
 
 /** Registers a detected launch as a LongPaid token paying `handle` (also used by the admin for manual fixes). */
-export function registerDetected(db: Db, asset: string, handle: string, chainId: number, image: string | null = null) {
-  const r = db.prepare("SELECT * FROM detected_launches WHERE asset = ?").get(asset.toLowerCase()) as Pending | undefined;
+export async function registerDetected(db: Db, asset: string, handle: string, chainId: number, image: string | null = null) {
+  const r = await db.prepare("SELECT * FROM detected_launches WHERE asset = ?").get(asset.toLowerCase()) as Pending | undefined;
   if (!r) throw new Error(`unknown launch ${asset}`);
-  upsertToken(db, {
+  await upsertToken(db, {
     address: r.asset,
     chainId,
     name: r.name,
@@ -204,7 +204,7 @@ export function registerDetected(db: Db, asset: string, handle: string, chainId:
     creator: r.launcher,
     launchedAt: r.launched_at,
   });
-  db.prepare("UPDATE detected_launches SET status = 'registered', handle = ?, note = NULL, updated_at = ? WHERE asset = ?").run(
+  await db.prepare("UPDATE detected_launches SET status = 'registered', handle = ?, note = NULL, updated_at = ? WHERE asset = ?").run(
     handle,
     Date.now(),
     r.asset,

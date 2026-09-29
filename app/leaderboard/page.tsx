@@ -6,9 +6,9 @@ import { TokensTable } from "@/components/Tables.tsx";
 
 export const dynamic = "force-dynamic";
 
-export default function Leaderboard() {
-  const d = db();
-  const accounts = topAccounts(d, 50);
+export default async function Leaderboard() {
+  const d = await db();
+  const accounts = await topAccounts(d, 50);
   return (
     <>
       <div className="hero" style={{ paddingBottom: 0 }}>
@@ -47,7 +47,7 @@ export default function Leaderboard() {
       </section>
       <section>
         <h2>Top tokens</h2>
-        <TokensTable rows={listTokens(d, { limit: 50 })} />
+        <TokensTable rows={await listTokens(d, { limit: 50 })} />
       </section>
     </>
   );

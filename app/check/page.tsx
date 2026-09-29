@@ -39,10 +39,10 @@ export default async function Check({ searchParams }: { searchParams: Promise<{ 
     }
   }
   // A launch we've seen but whose metadata isn't read yet: read it now rather than wait for the next scan.
-  const seen = valid ? getDetected(db(), address) : null;
+  const seen = valid ? await getDetected((await db()), address) : null;
   if (seen && (seen.status === "pending" || seen.note === "metadata unreachable")) await resolveDetected(address).catch(() => null);
-  const tracked = valid ? getToken(db(), address) : null;
-  const detected = valid ? getDetected(db(), address) : null;
+  const tracked = valid ? await getToken((await db()), address) : null;
+  const detected = valid ? await getDetected((await db()), address) : null;
   const handle = tracked?.handle ?? detected?.handle ?? inspection?.handle ?? null;
   const handleLabel = config.detect.handle ? `@${config.detect.handle}` : config.appName;
 

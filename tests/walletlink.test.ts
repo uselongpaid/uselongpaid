@@ -29,7 +29,7 @@ test("the signed message proves the wallet, and the code is tied to the signatur
   assert.equal(verificationCode(signature), code);
 });
 
-test("parseTweetUrl only accepts status links under the same handle", () => {
+test("parseTweetUrl only accepts status links under the same handle", async () => {
   assert.equal(parseTweetUrl("https://x.com/Alice/status/1839000000000000001?s=20", "alice"), "https://x.com/Alice/status/1839000000000000001");
   assert.equal(parseTweetUrl("twitter.com/alice/status/1839000000000000001", "alice"), "https://x.com/alice/status/1839000000000000001");
   assert.equal(parseTweetUrl("https://x.com/bob/status/1839000000000000001", "alice"), null);
@@ -38,20 +38,20 @@ test("parseTweetUrl only accepts status links under the same handle", () => {
 });
 
 test("approving a request sets the wallet, closes rivals, and releases waiting payouts", async () => {
-  const db = openDb(":memory:");
+  const db = await openDb(":memory:");
   const opts = { recipientShareBps: 8000, milestones: parseMilestones(undefined, undefined) };
-  upsertToken(db, { address: "0x" + "a".repeat(40), chainId: 4663, name: "Moon", symbol: "MOON", handle: "alice", launchedAt: 0 });
-  recordClaim(db, opts, "0x" + "a".repeat(40), 10_000_000, "0x" + "1".repeat(64));
+  await upsertToken(db, { address: "0x" + "a".repeat(40), chainId: 4663, name: "Moon", symbol: "MOON", handle: "alice", launchedAt: 0 });
+  await recordClaim(db, opts, "0x" + "a".repeat(40), 10_000_000, "0x" + "1".repeat(64));
 
   const base = { handle: "alice", message: "m", signature: "0x01", code: "LP-00000000", tweetUrl: "https://x.com/alice/status/123456" };
-  const good = createLinkRequest(db, { ...base, wallet: account.address });
-  const rival = createLinkRequest(db, { ...base, wallet: "0x" + "9".repeat(40) });
-  assert.equal(listLinkRequests(db, { status: "pending" }).length, 2);
+  const good = await createLinkRequest(db, { ...base, wallet: account.address });
+  const rival = await createLinkRequest(db, { ...base, wallet: "0x" + "9".repeat(40) });
+  assert.equal((await listLinkRequests(db, { status: "pending" })).length, 2);
 
-  decideLinkRequest(db, good, true);
-  assert.equal(getAccount(db, "alice")!.wallet, account.address);
-  assert.equal(listLinkRequests(db, { status: "pending" }).length, 0);
-  assert.throws(() => decideLinkRequest(db, rival, true), /already rejected/);
+  await decideLinkRequest(db, good, true);
+  assert.equal((await getAccount(db, "alice"))!.wallet, account.address);
+  assert.equal((await listLinkRequests(db, { status: "pending" })).length, 0);
+  await assert.rejects(() => decideLinkRequest(db, rival, true), /already rejected/);
 
   const sentTo: (string | null)[] = [];
   const provider: PayoutProvider = {
@@ -67,12 +67,12 @@ test("approving a request sets the wallet, closes rivals, and releases waiting p
   assert.deepEqual(sentTo, [account.address]);
 });
 
-test("a repeat request from the same handle and wallet replaces the pending one", () => {
-  const db = openDb(":memory:");
+test("a repeat request from the same handle and wallet replaces the pending one", async () => {
+  const db = await openDb(":memory:");
   const r = { handle: "alice", wallet: account.address, message: "m", signature: "0x01", code: "LP-1", tweetUrl: "https://x.com/alice/status/123456" };
-  createLinkRequest(db, r);
-  createLinkRequest(db, { ...r, code: "LP-2" });
-  const pending = listLinkRequests(db, { status: "pending" });
+  await createLinkRequest(db, r);
+  await createLinkRequest(db, { ...r, code: "LP-2" });
+  const pending = await listLinkRequests(db, { status: "pending" });
   assert.equal(pending.length, 1);
   assert.equal(pending[0].code, "LP-2");
 });

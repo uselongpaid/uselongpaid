@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function Token({ params }: { params: Promise<{ address: string }> }) {
   const { address } = await params;
   if (!/^0x[0-9a-fA-F]{40}$/.test(address)) notFound();
-  const d = db();
-  const token = getToken(d, address);
+  const d = await db();
+  const token = await getToken(d, address);
 
   if (!token) {
     return (
@@ -27,8 +27,8 @@ export default async function Token({ params }: { params: Promise<{ address: str
     );
   }
 
-  const claims = recentClaims(d, { token: token.address, limit: 50 });
-  const totals = tokenTotals(d, token.address);
+  const claims = await recentClaims(d, { token: token.address, limit: 50 });
+  const totals = await tokenTotals(d, token.address);
 
   return (
     <>

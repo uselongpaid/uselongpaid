@@ -12,7 +12,9 @@ function num(name: string, fallback: number): number {
 export const config = {
   appName: process.env.NEXT_PUBLIC_APP_NAME || "LongPaid",
   chain,
-  databasePath: process.env.DATABASE_PATH || "./data/longpaid.db",
+  /** libsql://… (Turso) in production, or a local SQLite file. DATABASE_PATH is the older name for a file path. */
+  databaseUrl: process.env.DATABASE_URL || process.env.DATABASE_PATH || "./data/longpaid.db",
+  databaseAuthToken: process.env.DATABASE_AUTH_TOKEN || "",
   cronSecret: process.env.CRON_SECRET || "",
   recipientShareBps: num("RECIPIENT_SHARE_BPS", 8000),
   milestones: parseMilestones(process.env.PAYOUT_MILESTONES_USD, process.env.PAYOUT_MILESTONE_STEP_USD),
@@ -48,6 +50,8 @@ export const config = {
     startBlock: process.env.LONG_FACTORY_START_BLOCK ? BigInt(process.env.LONG_FACTORY_START_BLOCK) : undefined,
     /** Background scan interval inside the web process; 0 turns it off (use the cron route instead). */
     intervalMs: num("LONG_SYNC_INTERVAL_MS", 120_000),
+    /** Log ranges scanned per run. Kept small on serverless hosts so a run fits their time limit; the cursor carries on. */
+    maxRanges: num("LONG_SYNC_MAX_RANGES", process.env.NETLIFY ? 10 : 200),
   },
   long: {
     rpcUrl: process.env.LONG_RPC_URL || chain.rpcUrl,

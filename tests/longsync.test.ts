@@ -82,7 +82,7 @@ function launch(block: bigint, receiver: string, meta: TokenMetadata | null): Fa
 
 const opts = { feeWallets: [OURS], excludeHandles: ["longpaid"], chainId: 4663, startBlock: 100n };
 
-test("poolDataIncludes matches whole words only", () => {
+test("poolDataIncludes matches whole words only", async () => {
   assert.equal(poolDataIncludes(poolData(OURS), [OURS]), OURS);
   assert.equal(poolDataIncludes(poolData(OTHER), [OURS]), null);
   // An address that only appears as part of a longer word must not match.
@@ -92,7 +92,7 @@ test("poolDataIncludes matches whole words only", () => {
 });
 
 test("launches routed to LongPaid with a bio handle are registered automatically", async () => {
-  const db = openDb(":memory:");
+  const db = await openDb(":memory:");
   const mine = launch(150n, OURS, { name: "Moon", description: "to the moon. fees @Alice", image: "ipfs://img1" });
   const notMine = launch(160n, OTHER, { description: "fees @bob" });
   const { reader, fetchMeta } = fake([mine, notMine]);
@@ -103,41 +103,41 @@ test("launches routed to LongPaid with a bio handle are registered automatically
   assert.deepEqual(r.registered.map((x) => x.handle), ["alice"]);
   assert.ok(r.caughtUp);
 
-  const t = getToken(db, mine.asset)!;
+  const t = (await getToken(db, mine.asset))!;
   assert.equal(t.handle, "alice");
   assert.equal(t.launched_at, 150_000);
   assert.match(t.image ?? "", /^https:\/\/.+\/img1$/);
-  assert.equal(getToken(db, notMine.asset), null, "a bio alone can't route fees to us");
-  assert.equal(getDetected(db, notMine.asset), null);
+  assert.equal(await getToken(db, notMine.asset), null, "a bio alone can't route fees to us");
+  assert.equal(await getDetected(db, notMine.asset), null);
 });
 
 test("routed launches without a usable handle wait for the admin", async () => {
-  const db = openDb(":memory:");
+  const db = await openDb(":memory:");
   const noBio = launch(120n, OURS, { description: "gm" });
   const onlyUs = launch(121n, OURS, { description: "fees @longpaid" });
   const { reader, fetchMeta } = fake([noBio, onlyUs]);
 
   const r = await syncLaunches(db, reader, fetchMeta, opts);
   assert.equal(r.needsHandle.length, 2);
-  assert.equal(listDetected(db, "needs_handle").length, 2);
+  assert.equal((await listDetected(db, "needs_handle")).length, 2);
 
-  registerDetected(db, noBio.asset, "carol", 4663);
-  assert.equal(getToken(db, noBio.asset)!.handle, "carol");
-  assert.equal(getDetected(db, noBio.asset)!.status, "registered");
+  await registerDetected(db, noBio.asset, "carol", 4663);
+  assert.equal((await getToken(db, noBio.asset))!.handle, "carol");
+  assert.equal((await getDetected(db, noBio.asset))!.status, "registered");
 });
 
 test("unreachable metadata is retried, then handed to the admin", async () => {
-  const db = openDb(":memory:");
+  const db = await openDb(":memory:");
   const l = launch(130n, OURS, null);
   const { reader, fetchMeta } = fake([l]);
   for (let i = 0; i < 4; i++) await syncLaunches(db, reader, fetchMeta, { ...opts, maxMetadataAttempts: 5 });
-  assert.equal(getDetected(db, l.asset)!.status, "pending");
+  assert.equal((await getDetected(db, l.asset))!.status, "pending");
   await syncLaunches(db, reader, fetchMeta, { ...opts, maxMetadataAttempts: 5 });
-  assert.equal(getDetected(db, l.asset)!.status, "needs_handle");
+  assert.equal((await getDetected(db, l.asset))!.status, "needs_handle");
 });
 
 test("the cursor advances, reruns don't duplicate, and oversized ranges are split", async () => {
-  const db = openDb(":memory:");
+  const db = await openDb(":memory:");
   const l = launch(900n, OURS, { description: "fees @dave" });
   const f = fake([l], 1000n, 300n);
   const r1 = await syncLaunches(db, f.reader, f.fetchMeta, opts);
@@ -149,7 +149,7 @@ test("the cursor advances, reruns don't duplicate, and oversized ranges are spli
   const r2 = await syncLaunches(db, f.reader, f.fetchMeta, opts);
   assert.equal(r2.scanned, 0);
   assert.equal(r2.registered.length, 0);
-  assert.equal(listDetected(db).length, 1);
+  assert.equal((await listDetected(db)).length, 1);
 });
 
 test("metadata URLs try several IPFS gateways for any IPFS form", async () => {

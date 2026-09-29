@@ -8,12 +8,12 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ handle: string }> }) {
   const handle = normalizeHandle(decodeURIComponent((await params).handle));
   if (!handle) return NextResponse.json({ error: "invalid handle" }, { status: 400 });
-  const d = db();
+  const d = await db();
   return NextResponse.json({
     handle,
-    account: getAccount(d, handle),
-    tokens: listTokens(d, { handle, limit: 200 }),
-    payouts: listPayouts(d, { handle, limit: 50 }),
-    claims: recentClaims(d, { handle, limit: 50 }),
+    account: await getAccount(d, handle),
+    tokens: await listTokens(d, { handle, limit: 200 }),
+    payouts: await listPayouts(d, { handle, limit: 50 }),
+    claims: await recentClaims(d, { handle, limit: 50 }),
   });
 }

@@ -14,9 +14,9 @@ export const dynamic = "force-dynamic";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ notfound?: string }> }) {
   const { notfound } = await searchParams;
-  const d = db();
+  const d = await db();
   const feeHandle = config.detect.handle ? `@${config.detect.handle}` : config.appName;
-  const stats = getStats(d);
+  const stats = await getStats(d);
   const share = config.recipientShareBps / 100;
 
   const minMilestone = formatUsd(config.milestones.list[0]);
@@ -221,17 +221,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ n
 
       <section>
         <h2>Fees claimed, last 14 days</h2>
-        <FeesChart data={dailyFees(d, 14)} />
+        <FeesChart data={await dailyFees(d, 14)} />
       </section>
 
       <section>
         <h2>Recent claims</h2>
-        <ClaimsTable rows={recentClaims(d, { limit: 10 })} />
+        <ClaimsTable rows={await recentClaims(d, { limit: 10 })} />
       </section>
 
       <section>
         <h2>Top tokens</h2>
-        <TokensTable rows={listTokens(d, { limit: 10 })} />
+        <TokensTable rows={await listTokens(d, { limit: 10 })} />
       </section>
 
       <section>

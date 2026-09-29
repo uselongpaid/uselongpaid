@@ -8,10 +8,14 @@ import type { PayoutProvider } from "./payouts/types.ts";
 import { createPayoutProvider } from "./providers.ts";
 import { ManualFeeSource } from "./sources/manual.ts";
 
-const g = globalThis as unknown as { __db?: Db };
+const g = globalThis as unknown as { __db?: Promise<Db> };
 
-export function db(): Db {
-  g.__db ??= openDb(config.databasePath);
+/** The shared database connection (opened, and the schema checked, once per server instance). */
+export function db(): Promise<Db> {
+  g.__db ??= openDb(config.databaseUrl, config.databaseAuthToken).catch((e) => {
+    g.__db = undefined;
+    throw e;
+  });
   return g.__db;
 }
 

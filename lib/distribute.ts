@@ -24,7 +24,7 @@ type Queued = { id: number; handle: string; amount_micros: number; attempted_at:
  */
 export async function distributePending(db: Db, provider: PayoutProvider, opts: { handle?: string } = {}): Promise<DistributionReport> {
   const report: DistributionReport = { sent: [], failed: [], waiting: 0, needsReview: [], errors: [] };
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT p.id, p.handle, p.amount_micros, p.attempted_at, a.wallet
        FROM payouts p LEFT JOIN accounts a ON a.handle = p.handle
@@ -38,7 +38,7 @@ export async function distributePending(db: Db, provider: PayoutProvider, opts: 
       continue;
     }
     // Claim the payout for this run; a concurrent run sees attempted_at and skips it.
-    const claimed = db
+    const claimed = await db
       .prepare("UPDATE payouts SET attempted_at = ? WHERE id = ? AND status = 'queued' AND (attempted_at IS NULL OR ?)")
       .run(Date.now(), p.id, provider.retrySafe ? 1 : 0);
     if (claimed.changes === 0) continue;
@@ -46,20 +46,20 @@ export async function distributePending(db: Db, provider: PayoutProvider, opts: 
     try {
       const result = await provider.send(
         { id: p.id, handle: p.handle, amountMicros: p.amount_micros, wallet: p.wallet },
-        { onBroadcast: (ref) => db.prepare("UPDATE payouts SET attempt_ref = ? WHERE id = ?").run(ref, p.id) },
+        { onBroadcast: (ref) => void db.prepare("UPDATE payouts SET attempt_ref = ? WHERE id = ?").run(ref, p.id) },
       );
       if (result === null) {
-        db.prepare("UPDATE payouts SET attempted_at = NULL WHERE id = ?").run(p.id);
+        await db.prepare("UPDATE payouts SET attempted_at = NULL WHERE id = ?").run(p.id);
         report.waiting++;
         continue;
       }
-      settlePayout(db, p.id, result);
+      await settlePayout(db, p.id, result);
       if (result.ok) report.sent.push({ id: p.id, handle: p.handle, amountMicros: p.amount_micros, ref: result.ref });
       else report.failed.push({ id: p.id, handle: p.handle, reason: result.reason });
     } catch (e) {
       // `notSent` means the provider knows nothing left (e.g. a failed simulation), so a retry is safe.
       if (provider.retrySafe || (e as { notSent?: boolean }).notSent) {
-        db.prepare("UPDATE payouts SET attempted_at = NULL, attempt_ref = NULL WHERE id = ?").run(p.id);
+        await db.prepare("UPDATE payouts SET attempted_at = NULL, attempt_ref = NULL WHERE id = ?").run(p.id);
       } else {
         report.needsReview.push(p.id);
       }

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { handleFromMetadata, normalizeHandle } from "../lib/handle.ts";
 
-test("normalizeHandle accepts @handles and x.com / twitter.com links", () => {
+test("normalizeHandle accepts @handles and x.com / twitter.com links", async () => {
   assert.equal(normalizeHandle("@Moon_Whale"), "moon_whale");
   assert.equal(normalizeHandle("https://x.com/MoonWhale?s=20"), "moonwhale");
   assert.equal(normalizeHandle("twitter.com/abc/status/1"), "abc");
@@ -10,7 +10,7 @@ test("normalizeHandle accepts @handles and x.com / twitter.com links", () => {
   assert.equal(normalizeHandle("bad-handle"), null);
 });
 
-test("handleFromMetadata prefers explicit fields, then the description marker", () => {
+test("handleFromMetadata prefers explicit fields, then the description marker", async () => {
   assert.equal(handleFromMetadata({ feeRecipient: "@alice", twitter: "@bob" }), "alice");
   assert.equal(handleFromMetadata({ twitter: "https://x.com/bob" }), "bob");
   assert.equal(handleFromMetadata({ description: "gm. fees to @carol forever" }), "carol");

@@ -4,6 +4,6 @@ import { db } from "@/lib/server.ts";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  return NextResponse.json(getStats(db()));
+export async function GET() {
+  return NextResponse.json(await getStats((await db())));
 }

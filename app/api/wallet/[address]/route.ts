@@ -9,18 +9,18 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ address: string }> }) {
   const { address } = await params;
   if (!isAddress(address)) return NextResponse.json({ error: "invalid address" }, { status: 400 });
-  const d = db();
-  const accounts = accountsForWallet(d, address);
+  const d = await db();
+  const accounts = await accountsForWallet(d, address);
   return NextResponse.json({
-    accounts: accounts.map((a) => ({
+    accounts: await Promise.all(accounts.map(async (a) => ({
       handle: a.handle,
       lifetimeMicros: a.lifetime_micros,
       paidMicros: a.paid_micros,
       balanceMicros: a.balance_micros,
-      queuedMicros: listPayouts(d, { handle: a.handle, status: "queued" }).reduce((s, p) => s + p.amount_micros, 0),
+      queuedMicros: (await listPayouts(d, { handle: a.handle, status: "queued" })).reduce((s, p) => s + p.amount_micros, 0),
       optedOut: Boolean(a.opted_out),
-    })),
-    requests: listLinkRequests(d, { wallet: address, limit: 20 }).map((r) => ({
+    }))),
+    requests: (await listLinkRequests(d, { wallet: address, limit: 20 })).map((r) => ({
       id: r.id,
       handle: r.handle,
       code: r.code,

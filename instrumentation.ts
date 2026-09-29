@@ -1,7 +1,9 @@
-// Runs once when the server starts. Keeps scanning long.xyz for launches routed to LongPaid, so new tokens
-// show up without a separate cron job. Set LONG_SYNC_INTERVAL_MS=0 to turn it off.
+// Runs once when the server starts. On a long-running server it keeps scanning long.xyz for launches routed to
+// LongPaid, so new tokens show up without a separate cron job. Set LONG_SYNC_INTERVAL_MS=0 to turn it off.
+// On serverless hosts (Netlify, Lambda) nothing stays running: the scheduled function in netlify/functions does it.
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  if (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME) return;
   const { config } = await import("./lib/config.ts");
   if (!config.detect.intervalMs || config.detect.feeWallets.length === 0) return;
   const { runLaunchSync } = await import("./lib/detect.ts");

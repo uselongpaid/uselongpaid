@@ -44,6 +44,6 @@ export async function POST(req: Request) {
   if (!valid) return bad("The signature doesn't match this wallet.");
 
   const code = verificationCode(signature);
-  const id = createLinkRequest(db(), { handle, wallet, message, signature, code, tweetUrl });
+  const id = await createLinkRequest((await db()), { handle, wallet, message, signature, code, tweetUrl });
   return NextResponse.json({ ok: true, id, code, status: "pending" });
 }

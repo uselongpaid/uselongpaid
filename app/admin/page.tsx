@@ -28,20 +28,21 @@ function TxLink({ hash }: { hash: string | null }) {
 export default async function Admin({ searchParams }: { searchParams: Promise<{ msg?: string; err?: string }> }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const { msg, err } = await searchParams;
-  const d = db();
-  const stats = getStats(d);
-  const tokens = listTokens(d, { limit: 200, sort: "new" });
-  const queued = d
+  const d = await db();
+  const stats = await getStats(d);
+  const tokens = await listTokens(d, { limit: 200, sort: "new" });
+  const queued = (await d
     .prepare(
       `SELECT p.*, a.wallet FROM payouts p LEFT JOIN accounts a ON a.handle = p.handle
        WHERE p.status = 'queued' ORDER BY p.id`,
     )
-    .all() as (ReturnType<typeof listPayouts>[number] & { wallet: string | null })[];
-  const recentPayouts = listPayouts(d, { limit: 15 }).filter((p) => p.status !== "queued");
-  const burnPending = pendingBurnMicros(d);
-  const links = listLinkRequests(d, { status: "pending", limit: 100 });
-  const needHandle = listDetected(d, "needs_handle", 100);
-  const recentDetected = listDetected(d, undefined, 10);
+    .all()) as (Awaited<ReturnType<typeof listPayouts>>[number] & { wallet: string | null })[];
+  const recentPayouts = (await listPayouts(d, { limit: 15 })).filter((p) => p.status !== "queued");
+  const burnPending = await pendingBurnMicros(d);
+  const links = await listLinkRequests(d, { status: "pending", limit: 100 });
+  const needHandle = await listDetected(d, "needs_handle", 100);
+  const recentDetected = await listDetected(d, undefined, 10);
+  const linkWallets = new Map(await Promise.all(links.map(async (l) => [l.handle, (await getAccount(d, l.handle))?.wallet ?? null] as const)));
 
   let provider = config.payoutProvider as string;
   let walletInfo: string | null = null;
@@ -285,7 +286,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               </thead>
               <tbody>
                 {links.map((l) => {
-                  const current = getAccount(d, l.handle)?.wallet;
+                  const current = linkWallets.get(l.handle);
                   return (
                     <tr key={l.id}>
                       <td>
@@ -512,7 +513,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               </tr>
             </thead>
             <tbody>
-              {recentClaims(d, { limit: 20 }).map((c) => (
+              {(await recentClaims(d, { limit: 20 })).map((c) => (
                 <tr key={c.id}>
                   <td>${c.symbol}</td>
                   <td>@{c.handle}</td>

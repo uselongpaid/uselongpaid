@@ -12,6 +12,6 @@ export async function POST(req: Request) {
   if (!handle || typeof body?.optedOut !== "boolean") {
     return NextResponse.json({ error: "expected {handle, optedOut}" }, { status: 400 });
   }
-  setOptOut(db(), handle, body.optedOut);
+  await setOptOut((await db()), handle, body.optedOut);
   return NextResponse.json({ handle, optedOut: body.optedOut });
 }

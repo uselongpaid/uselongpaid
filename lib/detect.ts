@@ -16,23 +16,21 @@ function syncOptions(): SyncOptions {
     excludeHandles: config.detect.handle ? [config.detect.handle] : [],
     chainId: config.chain.id,
     startBlock: config.detect.startBlock,
+    maxRanges: config.detect.maxRanges,
   };
 }
 
 /** Reads a detected launch's metadata now and registers it if the bio names a handle. */
-export function resolveDetected(asset: string): Promise<SyncReport> {
-  return resolveAsset(db(), fetchMetadata, syncOptions(), asset);
+export async function resolveDetected(asset: string): Promise<SyncReport> {
+  return resolveAsset(await db(), fetchMetadata, syncOptions(), asset);
 }
 
 /** One scan of long.xyz's factory. Concurrent callers share the run in progress. */
 export function runLaunchSync(): Promise<SyncReport> {
   if (!detectionEnabled()) return Promise.reject(new Error("set LONGPAID_FEE_WALLETS first"));
-  running ??= syncLaunches(db(), new ViemLaunchReader(config.long.rpcUrl, config.detect.factory), fetchMetadata, {
-    feeWallets: config.detect.feeWallets,
-    excludeHandles: config.detect.handle ? [config.detect.handle] : [],
-    chainId: config.chain.id,
-    startBlock: config.detect.startBlock,
-  }).finally(() => {
+  running ??= db()
+    .then((d) => syncLaunches(d, new ViemLaunchReader(config.long.rpcUrl, config.detect.factory), fetchMetadata, syncOptions()))
+    .finally(() => {
     running = null;
   });
   return running;

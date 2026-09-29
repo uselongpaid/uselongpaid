@@ -20,16 +20,16 @@ const CURSOR_KEY = "source_cursor";
 export async function runClaimCycle(db: Db, source: FeeSource, payouts: PayoutProvider, opts: LedgerOptions): Promise<CycleReport> {
   const report: CycleReport = { discovered: 0, claimed: [], payoutsQueued: 0, payoutsSent: 0, distribution: emptyReport(), errors: [] };
 
-  const { tokens, cursor } = await source.discoverTokens(getKv(db, CURSOR_KEY));
-  for (const t of tokens) upsertToken(db, t);
-  if (cursor !== null) setKv(db, CURSOR_KEY, cursor);
+  const { tokens, cursor } = await source.discoverTokens(await getKv(db, CURSOR_KEY));
+  for (const t of tokens) await upsertToken(db, t);
+  if (cursor !== null) await setKv(db, CURSOR_KEY, cursor);
   report.discovered = tokens.length;
 
-  for (const token of listTokens(db, { limit: 200, sort: "new" })) {
+  for (const token of await listTokens(db, { limit: 200, sort: "new" })) {
     try {
       const { amountMicros, txHash } = await source.claim(token.address);
       if (amountMicros <= 0) continue;
-      const { payoutId } = recordClaim(db, opts, token.address, amountMicros, txHash);
+      const { payoutId } = await recordClaim(db, opts, token.address, amountMicros, txHash);
       report.claimed.push({ token: token.address, amountMicros, txHash });
       if (payoutId !== null) report.payoutsQueued++;
     } catch (e) {

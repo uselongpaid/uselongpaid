@@ -11,48 +11,48 @@ import { parseMilestones } from "../lib/milestones.ts";
 const opts = { recipientShareBps: 8000, milestones: parseMilestones(undefined, undefined) };
 const token = { address: "0xABC", chainId: 1, name: "T", symbol: "T", handle: "alice", launchedAt: 0 };
 
-test("claims credit the account and queue a payout at the milestone", () => {
-  const db = openDb(":memory:");
-  upsertToken(db, token);
+test("claims credit the account and queue a payout at the milestone", async () => {
+  const db = await openDb(":memory:");
+  await upsertToken(db, token);
 
-  assert.equal(recordClaim(db, opts, "0xabc", 5_000_000, null).payoutId, null);
-  assert.equal(getAccount(db, "alice")!.balance_micros, 4_000_000);
+  assert.equal((await recordClaim(db, opts, "0xabc", 5_000_000, null)).payoutId, null);
+  assert.equal((await getAccount(db, "alice"))!.balance_micros, 4_000_000);
 
-  const { payoutId } = recordClaim(db, opts, "0xabc", 10_000_000, "0x1");
+  const { payoutId } = await recordClaim(db, opts, "0xabc", 10_000_000, "0x1");
   assert.ok(payoutId);
-  assert.equal(getAccount(db, "alice")!.balance_micros, 0);
-  assert.equal(listPayouts(db, { status: "queued" })[0].amount_micros, 12_000_000);
+  assert.equal((await getAccount(db, "alice"))!.balance_micros, 0);
+  assert.equal((await listPayouts(db, { status: "queued" }))[0].amount_micros, 12_000_000);
 
-  settlePayout(db, payoutId!, { ok: true, ref: "r1" });
-  assert.equal(getAccount(db, "alice")!.paid_micros, 12_000_000);
-  assert.throws(() => settlePayout(db, payoutId!, { ok: true, ref: "again" }), /already paid/);
+  await settlePayout(db, payoutId!, { ok: true, ref: "r1" });
+  assert.equal((await getAccount(db, "alice"))!.paid_micros, 12_000_000);
+  await assert.rejects(() => settlePayout(db, payoutId!, { ok: true, ref: "again" }), /already paid/);
 
-  const s = getStats(db);
+  const s = await getStats(db);
   assert.equal(s.claimedMicros, 15_000_000);
   assert.equal(s.burnedMicros, 3_000_000);
   assert.equal(s.paidMicros, 12_000_000);
 });
 
-test("a failed payout returns money to the balance", () => {
-  const db = openDb(":memory:");
-  upsertToken(db, token);
-  const { payoutId } = recordClaim(db, opts, "0xabc", 20_000_000, null);
-  settlePayout(db, payoutId!, { ok: false, reason: "no X Money" });
-  assert.equal(getAccount(db, "alice")!.balance_micros, 16_000_000);
-  assert.equal(getAccount(db, "alice")!.paid_micros, 0);
+test("a failed payout returns money to the balance", async () => {
+  const db = await openDb(":memory:");
+  await upsertToken(db, token);
+  const { payoutId } = await recordClaim(db, opts, "0xabc", 20_000_000, null);
+  await settlePayout(db, payoutId!, { ok: false, reason: "no X Money" });
+  assert.equal((await getAccount(db, "alice"))!.balance_micros, 16_000_000);
+  assert.equal((await getAccount(db, "alice"))!.paid_micros, 0);
 });
 
-test("opted-out accounts receive nothing; the whole claim is burned", () => {
-  const db = openDb(":memory:");
-  upsertToken(db, token);
-  setOptOut(db, "alice", true);
-  recordClaim(db, opts, "0xabc", 50_000_000, null);
-  assert.equal(getAccount(db, "alice")!.lifetime_micros, 0);
-  assert.equal(getStats(db).burnedMicros, 50_000_000);
+test("opted-out accounts receive nothing; the whole claim is burned", async () => {
+  const db = await openDb(":memory:");
+  await upsertToken(db, token);
+  await setOptOut(db, "alice", true);
+  await recordClaim(db, opts, "0xabc", 50_000_000, null);
+  assert.equal((await getAccount(db, "alice"))!.lifetime_micros, 0);
+  assert.equal((await getStats(db)).burnedMicros, 50_000_000);
 });
 
 test("claim cycle discovers tokens once and keeps the ledger balanced", async () => {
-  const db = openDb(":memory:");
+  const db = await openDb(":memory:");
   // Test double for the automatic (longxyz) mode: 3 tokens, each with $12 of fees per claim.
   const launched = ["a", "b", "c"].map((c, i) => ({
     address: "0x" + c.repeat(40), chainId: 1, name: c, symbol: c.toUpperCase(), handle: `h${i}`, launchedAt: i,
@@ -76,7 +76,7 @@ test("claim cycle discovers tokens once and keeps the ledger balanced", async ()
   assert.equal(r2.discovered, 0);
   assert.equal(r1.errors.length + r2.errors.length, 0);
 
-  const row = db
+  const row = (await db
     .prepare(
       `SELECT (SELECT SUM(amount_micros) FROM claims) AS claimed,
               (SELECT SUM(recipient_micros) FROM claims) AS recipient,
@@ -84,22 +84,22 @@ test("claim cycle discovers tokens once and keeps the ledger balanced", async ()
               (SELECT COALESCE(SUM(amount_micros),0) FROM payouts) AS payouts,
               (SELECT SUM(burn_micros) FROM claims) AS burn`,
     )
-    .get() as Record<string, number>;
+    .get()) as Record<string, number>;
   assert.equal(row.recipient + row.burn, row.claimed);
   assert.equal(row.balances + row.payouts, row.recipient);
 });
 
 test("dailyFees buckets claims by UTC day and fills empty days", async () => {
   const { dailyFees, earningsByToken } = await import("../lib/queries.ts");
-  const db = openDb(":memory:");
-  upsertToken(db, token);
+  const db = await openDb(":memory:");
+  await upsertToken(db, token);
   const now = Date.UTC(2026, 8, 26, 12);
-  recordClaim(db, opts, "0xabc", 2_000_000, null);
-  recordClaim(db, opts, "0xabc", 3_000_000, null);
-  db.prepare("UPDATE claims SET created_at = ? WHERE id = 1").run(Date.UTC(2026, 8, 24, 23));
-  db.prepare("UPDATE claims SET created_at = ? WHERE id = 2").run(Date.UTC(2026, 8, 26, 1));
+  await recordClaim(db, opts, "0xabc", 2_000_000, null);
+  await recordClaim(db, opts, "0xabc", 3_000_000, null);
+  await db.prepare("UPDATE claims SET created_at = ? WHERE id = 1").run(Date.UTC(2026, 8, 24, 23));
+  await db.prepare("UPDATE claims SET created_at = ? WHERE id = 2").run(Date.UTC(2026, 8, 26, 1));
 
-  const days = dailyFees(db, 4, now);
+  const days = await dailyFees(db, 4, now);
   assert.deepEqual(days, [
     { day: "2026-09-23", micros: 0 },
     { day: "2026-09-24", micros: 2_000_000 },
@@ -107,7 +107,7 @@ test("dailyFees buckets claims by UTC day and fills empty days", async () => {
     { day: "2026-09-26", micros: 3_000_000 },
   ]);
   assert.deepEqual(
-    earningsByToken(db, "alice").map((t) => [t.claims, t.earned]),
+    (await earningsByToken(db, "alice")).map((t) => [t.claims, t.earned]),
     [[2, 4_000_000]],
   );
 });

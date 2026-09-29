@@ -17,7 +17,8 @@
   <img src="https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs" alt="Next.js 16" />
   <img src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white" alt="TypeScript strict" />
   <img src="https://img.shields.io/badge/viem-2-1e1e1e" alt="viem 2" />
-  <img src="https://img.shields.io/badge/SQLite-node%3Asqlite-003b57?logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/libSQL-Turso-4ff8d2?logo=turso&logoColor=black" alt="libSQL / Turso" />
+  <img src="https://img.shields.io/badge/Netlify-deploy-00c7b7?logo=netlify&logoColor=white" alt="Netlify" />
 </p>
 
 ---
@@ -122,7 +123,7 @@ flowchart LR
         Payouts["payouts/<br/>erc20 · webhook · manual"]
     end
 
-    DB[("SQLite<br/>node:sqlite, WAL")]
+    DB[("libSQL<br/>Turso / SQLite file")]
     Chain[("EVM chain<br/>viem")]
 
     Pages --> Core
@@ -141,7 +142,8 @@ flowchart LR
   Adding a rail (for example X Money, once it has an API) is one class.
 - **Money is integer micro-dollars** (`1 USD = 1_000_000`) everywhere, so there's no floating-point drift. On-chain amounts
   are converted with `bigint`.
-- **SQLite with WAL** keeps deployment to one process and one file. Every ledger change runs in a transaction.
+- **libSQL** (Turso in production, a SQLite file locally) keeps the schema plain SQLite. Every ledger change runs in one
+  write transaction.
 
 ## The money flow in detail
 
@@ -267,38 +269,45 @@ The schema is created and migrated automatically on start (additive `ALTER TABLE
 
 ## Running it
 
-Requires **Node.js 22.13+** (for the built-in `node:sqlite`).
+Requires **Node.js 22+**. The database is **libSQL**: a hosted [Turso](https://turso.tech) database in production, a
+local SQLite file in development and tests ([`lib/db.ts`](lib/db.ts)).
 
 ```bash
 git clone https://github.com/uselongpaid/uselongpaid.git
 cd uselongpaid
 npm install
 cp .env.example .env.local     # fill in the values, see Configuration
-npm run dev                    # http://localhost:3000
+npm run dev                    # http://localhost:3000, database in ./data/longpaid.db
 ```
 
-Production:
+### Deploying on Netlify (free)
 
-```bash
-npm run build
-npm start
-```
+1. **Database.** Create a free Turso database and a token:
+   ```bash
+   turso db create longpaid            # or from an existing SQLite file: turso db create longpaid --from-file longpaid.db
+   turso db show longpaid --url        # → DATABASE_URL (libsql://…)
+   turso db tokens create longpaid     # → DATABASE_AUTH_TOKEN
+   ```
+   The schema is created on first start.
+2. **Site.** In Netlify: *Add new site → Import an existing project → GitHub → `uselongpaid/uselongpaid`*. The build
+   settings come from [`netlify.toml`](netlify.toml) (Node 22, `npm run build`, Next.js runtime).
+3. **Environment** (*Site configuration → Environment variables*): `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `APP_URL`
+   (`https://uselongpaid.xyz`), `ADMIN_PASSWORD`, `SESSION_SECRET`, `CRON_SECRET`, `LONGPAID_X_HANDLE`, and any other
+   values from [Configuration](#configuration). Redeploy after adding them.
+4. **Domain.** *Domain management → Add a domain → `uselongpaid.xyz`*, then point its DNS where Netlify says.
 
-Deploy it as **one long-running Node process with a persistent disk** for `DATABASE_PATH`: a VPS, Fly.io, Railway or Render
-with a volume. Serverless platforms with ephemeral filesystems will lose the database. Back up the SQLite file regularly,
-for example with `sqlite3 longpaid.db ".backup backup.db"` from cron.
+Serverless functions don't stay running, so the long.xyz scan and payout distribution run from the scheduled function
+[`netlify/functions/cron.mts`](netlify/functions/cron.mts) every 2 minutes (it calls `/api/cron/sync-launches` and
+`/api/cron/distribute` with `CRON_SECRET`). Each scan covers a few log ranges (`LONG_SYNC_MAX_RANGES`, 10 on Netlify) and
+the cursor picks up where it stopped.
 
-**Railway:** Railway's default Node build works as is (`npm ci`, `npm run build`, `npm start`). `railway.json` only adds
-a health check on `/api/version`, and `.nvmrc` pins Node 22. Don't set a custom build command that runs `npm ci` again:
-it collides with Railway's build cache (`EBUSY … node_modules/.cache`). Add a **Volume** mounted at `/data` and set `DATABASE_PATH=/data/longpaid.db`,
-or the database is wiped on every deploy. After a deploy, open `/api/version`: `commit` must match the latest commit on
-`main`.
+After a deploy, open `/api/version`: `commit` must match the latest commit on `main`.
 
-Schedule distribution so late wallet links and payouts that waited on a top-up go out on their own:
+### Other hosts
 
-```cron
-*/10 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-domain/api/cron/distribute
-```
+Any Node host works with the same variables. On a long-running server (a VPS, Railway, Render) the scan also runs in
+the background every `LONG_SYNC_INTERVAL_MS`, and `DATABASE_URL` can be a local file on a persistent disk
+(`DATABASE_URL=/data/longpaid.db`) instead of Turso.
 
 ## Operating it
 
@@ -347,7 +356,9 @@ All settings are environment variables. [`.env.example`](.env.example) lists eve
 | `CRON_SECRET` | yes | Bearer token for `/api/cron/*` and the JSON admin API. |
 | `APP_URL` | yes | Public URL. Used for same-origin checks. |
 | `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_CHAIN_NAME`, `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_EXPLORER_URL` | | Chain for Connect wallet and the default for every RPC. Defaults to Robinhood Chain mainnet (`4663`). Set at build time. |
-| `DATABASE_PATH` | | SQLite file. Default `./data/longpaid.db`. |
+| `DATABASE_URL` | yes (hosted) | `libsql://…` Turso URL, or a local SQLite file path. Default `./data/longpaid.db`. |
+| `DATABASE_AUTH_TOKEN` | Turso | Turso database token. |
+| `LONG_SYNC_MAX_RANGES` | | Log ranges per scan. Default 200, or 10 on Netlify. |
 | `LONG_RPC_URL`, `LONG_CHAIN_ID` | | RPC for claim-tx verification, wallet signatures and token info. Defaults to the chain above; use a dedicated provider in production. |
 | `TREASURY_ADDRESS` | yes | Fee beneficiary shown in the launch guide. |
 | `RECIPIENT_SHARE_BPS` | | Account share in basis points. Default `8000` (80%). |
@@ -440,7 +451,7 @@ tests/                     node:test suites
 ## Testing
 
 ```bash
-npm test            # unit and integration tests (node:test, in-memory SQLite)
+npm test            # unit and integration tests (node:test, temporary SQLite files via libSQL)
 npm run typecheck   # tsc --noEmit, strict
 npm run build       # production build
 ```

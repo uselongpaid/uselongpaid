@@ -8,5 +8,5 @@ export const maxDuration = 300;
 /** Sends any queued payouts (e.g. accounts that linked a wallet since). Call from cron. */
 export async function POST(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  return NextResponse.json(await distributePending(db(), payoutProvider()));
+  return NextResponse.json(await distributePending(await db(), payoutProvider()));
 }

@@ -1,6 +1,13 @@
-import { DatabaseSync } from "node:sqlite";
+// Database: libSQL. In production a hosted Turso database (DATABASE_URL=libsql://…, DATABASE_AUTH_TOKEN), so the app
+// runs on serverless hosts like Netlify; locally and in tests a SQLite file (file:…). The small async wrapper below
+// keeps the familiar prepare(sql).get/all/run shape.
+
+import { createClient, type Client, type InArgs, type ResultSet, type Transaction } from "@libsql/client";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS tokens (
@@ -96,53 +103,116 @@ CREATE INDEX IF NOT EXISTS detected_launches_status ON detected_launches(status)
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
 
-export type Db = DatabaseSync;
+type Value = string | number | bigint | null | Uint8Array | boolean;
+type Executor = Client | Transaction;
 
-export function openDb(path: string): Db {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
-  db.exec(SCHEMA);
-  migrate(db);
+export type Statement = {
+  get<T = Record<string, unknown>>(...args: Value[]): Promise<T | undefined>;
+  all<T = Record<string, unknown>>(...args: Value[]): Promise<T[]>;
+  run(...args: Value[]): Promise<{ changes: number; lastInsertRowid: number }>;
+};
+
+export interface Db {
+  prepare(sql: string): Statement;
+  exec(sql: string): Promise<void>;
+  /** Runs `fn` in one write transaction; everything it does through `t` commits or rolls back together. */
+  transaction<T>(fn: (t: Db) => Promise<T>): Promise<T>;
+  close(): void;
+}
+
+function rows(rs: ResultSet): Record<string, unknown>[] {
+  return rs.rows.map((r) => Object.fromEntries(rs.columns.map((c, i) => [c, r[i]])));
+}
+
+function wrap(ex: Executor, client: Client): Db {
+  const run = (sql: string, args: Value[]) => ex.execute({ sql, args: args as InArgs });
+  return {
+    prepare(sql) {
+      return {
+        async get<T>(...args: Value[]) {
+          return rows(await run(sql, args))[0] as T | undefined;
+        },
+        async all<T>(...args: Value[]) {
+          return rows(await run(sql, args)) as T[];
+        },
+        async run(...args: Value[]) {
+          const r = await run(sql, args);
+          return { changes: r.rowsAffected, lastInsertRowid: Number(r.lastInsertRowid ?? 0) };
+        },
+      };
+    },
+    async exec(sql) {
+      await ex.executeMultiple(sql);
+    },
+    async transaction(fn) {
+      if (ex !== client) return fn(this); // already inside one
+      const t = await client.transaction("write");
+      try {
+        const out = await fn(wrap(t, client));
+        await t.commit();
+        return out;
+      } catch (e) {
+        await t.rollback().catch(() => {});
+        throw e;
+      } finally {
+        t.close();
+      }
+    },
+    close() {
+      client.close();
+    },
+  };
+}
+
+/**
+ * Opens (and creates or migrates) the database. `url` is a libsql:// URL, a file: URL, a plain file path, or
+ * ":memory:" (a fresh temporary file, since libSQL transactions need a real file).
+ */
+export async function openDb(url: string, authToken?: string): Promise<Db> {
+  let u = url;
+  if (u === ":memory:") u = `file:${join(tmpdir(), `longpaid-${randomUUID()}.db`)}`;
+  else if (!/^[a-z]+:/i.test(u)) {
+    mkdirSync(dirname(u), { recursive: true });
+    u = `file:${u}`;
+  }
+  const client = createClient({ url: u, authToken: authToken || undefined });
+  const db = wrap(client, client);
+  if (u.startsWith("file:")) await db.exec("PRAGMA journal_mode = WAL;").catch(() => {});
+  await db.exec("PRAGMA foreign_keys = ON;").catch(() => {});
+  await db.exec(SCHEMA);
+  await migrate(db);
   return db;
 }
 
-function addColumn(db: Db, table: string, column: string, type: string) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+async function addColumn(db: Db, table: string, column: string, type: string) {
+  const cols = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+  if (!cols.some((c) => c.name === column)) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
-function migrate(db: Db) {
-  addColumn(db, "accounts", "milestone_micros", "INTEGER NOT NULL DEFAULT 0");
+async function migrate(db: Db) {
+  await addColumn(db, "accounts", "milestone_micros", "INTEGER NOT NULL DEFAULT 0");
   // Wallet the account owner linked (after signing in with X) for automatic payouts.
-  addColumn(db, "accounts", "wallet", "TEXT");
+  await addColumn(db, "accounts", "wallet", "TEXT");
   // Set just before a payout is handed to the provider; cleared once it settles or is safe to retry.
-  addColumn(db, "payouts", "attempted_at", "INTEGER");
+  await addColumn(db, "payouts", "attempted_at", "INTEGER");
   // Transaction hash or reference returned while a payout is in flight.
-  addColumn(db, "payouts", "attempt_ref", "TEXT");
+  await addColumn(db, "payouts", "attempt_ref", "TEXT");
   // Free-form note from the dev who recorded the claim (asset amount, price used, etc.).
-  addColumn(db, "claims", "note", "TEXT");
+  await addColumn(db, "claims", "note", "TEXT");
   // A claim transaction can only be recorded once.
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS claims_tx ON claims(tx_hash) WHERE tx_hash IS NOT NULL");
+  await db.exec("CREATE UNIQUE INDEX IF NOT EXISTS claims_tx ON claims(tx_hash) WHERE tx_hash IS NOT NULL");
 }
 
-export function tx<T>(db: Db, fn: () => T): T {
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    const out = fn();
-    db.exec("COMMIT");
-    return out;
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
+/** Runs `fn` in one write transaction. */
+export function tx<T>(db: Db, fn: (t: Db) => Promise<T>): Promise<T> {
+  return db.transaction(fn);
 }
 
-export function getKv(db: Db, key: string): string | null {
-  const row = db.prepare("SELECT value FROM kv WHERE key = ?").get(key) as { value: string } | undefined;
+export async function getKv(db: Db, key: string): Promise<string | null> {
+  const row = await db.prepare("SELECT value FROM kv WHERE key = ?").get<{ value: string }>(key);
   return row?.value ?? null;
 }
 
-export function setKv(db: Db, key: string, value: string) {
-  db.prepare("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+export async function setKv(db: Db, key: string, value: string): Promise<void> {
+  await db.prepare("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
 }

@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   if (!(await isAdmin())) return redirectTo("/admin/login");
   const f = await req.formData();
   const s = (k: string) => String(f.get(k) ?? "").trim();
-  const d = db();
+  const d = await db();
 
   try {
     switch (s("action")) {
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
           name ||= info.name;
           symbol ||= info.symbol;
         }
-        const existing = getToken(d, address);
-        upsertToken(d, {
+        const existing = await getToken(d, address);
+        await upsertToken(d, {
           address: getAddress(address),
           chainId: config.long.chainId,
           name,
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       }
 
       case "record-claim": {
-        const token = getToken(d, s("token"));
+        const token = await getToken(d, s("token"));
         if (!token) return back({ err: "Pick a token." });
         const micros = parseUsd(s("amount"));
         if (!micros) return back({ err: "Enter the claimed amount in USD, for example 125.40." });
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
         const ok = await manualSource().txSucceeded(txHash);
         if (ok === false) return back({ err: "That transaction wasn't found on chain or it failed." });
 
-        const { payoutId } = recordClaim(d, ledgerOptions(), token.address, micros, txHash, s("note") || null);
+        const { payoutId } = await recordClaim(d, ledgerOptions(), token.address, micros, txHash, s("note") || null);
         const dist = await distributePending(d, payoutProvider());
         const milestone = payoutId ? ` Milestone reached for @${token.handle}.` : "";
         return back({ msg: `Recorded ${formatUsd(micros)} for $${token.symbol}.${milestone} ${summarize(dist)}.` });
@@ -94,33 +94,33 @@ export async function POST(req: Request) {
         const id = Number(s("id"));
         const ref = s("ref") || (config.payoutProvider === "xmoney" ? "X Money" : "");
         if (!ref) return back({ err: "Enter the payment reference or tx hash." });
-        settlePayout(d, id, { ok: true, ref });
+        await settlePayout(d, id, { ok: true, ref });
         return back({ msg: `Payout #${id} marked ${config.payoutProvider === "xmoney" ? "sent on X Money" : "paid"}.` });
       }
 
       case "mark-failed": {
         const id = Number(s("id"));
-        settlePayout(d, id, { ok: false, reason: s("reason") || "marked failed by admin" });
+        await settlePayout(d, id, { ok: false, reason: s("reason") || "marked failed by admin" });
         return back({ msg: `Payout #${id} marked failed; the amount is back in the balance.` });
       }
 
       case "reset-attempt": {
         const id = Number(s("id"));
-        resetPayoutAttempt(d, id);
+        await resetPayoutAttempt(d, id);
         return back({ msg: `Payout #${id} will be retried on the next distribution.` });
       }
 
       case "burns-done": {
         const txHash = s("tx");
         if (!TX_RE.test(txHash)) return back({ err: "Enter the buyback-and-burn transaction hash." });
-        const n = markAllBurnsDone(d, txHash);
+        const n = await markAllBurnsDone(d, txHash);
         return back({ msg: `${n} pending burn(s) marked done.` });
       }
 
       case "link-approve":
       case "link-reject": {
         const approve = s("action") === "link-approve";
-        const { handle, wallet } = decideLinkRequest(d, Number(s("id")), approve);
+        const { handle, wallet } = await decideLinkRequest(d, Number(s("id")), approve);
         if (!approve) return back({ msg: `Rejected the request for @${handle}.` });
         const dist = await distributePending(d, payoutProvider(), { handle });
         return back({ msg: `@${handle} now gets paid to ${wallet}. ${summarize(dist)}.` });
@@ -139,12 +139,12 @@ export async function POST(req: Request) {
       case "assign-handle": {
         const handle = normalizeHandle(s("handle"));
         if (!handle) return back({ err: "X handle isn't valid." });
-        registerDetected(d, s("asset"), handle, config.chain.id);
+        await registerDetected(d, s("asset"), handle, config.chain.id);
         return back({ msg: `Registered, fees go to @${handle}.` });
       }
 
       case "dismiss-launch": {
-        d.prepare("UPDATE detected_launches SET status = 'dismissed', updated_at = ? WHERE asset = ?").run(Date.now(), s("asset").toLowerCase());
+        await d.prepare("UPDATE detected_launches SET status = 'dismissed', updated_at = ? WHERE asset = ?").run(Date.now(), s("asset").toLowerCase());
         return back({ msg: "Launch dismissed." });
       }
 
@@ -152,7 +152,7 @@ export async function POST(req: Request) {
         const handle = normalizeHandle(s("handle"));
         if (!handle) return back({ err: "X handle isn't valid." });
         const out = s("value") === "1";
-        setOptOut(d, handle, out);
+        await setOptOut(d, handle, out);
         return back({ msg: `@${handle} ${out ? "opted out" : "opted back in"}.` });
       }
 

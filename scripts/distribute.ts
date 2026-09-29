@@ -5,6 +5,6 @@ import { openDb } from "../lib/db.ts";
 import { distributePending } from "../lib/distribute.ts";
 import { createPayoutProvider } from "../lib/providers.ts";
 
-const report = await distributePending(openDb(config.databasePath), createPayoutProvider());
+const report = await distributePending(await openDb(config.databaseUrl, config.databaseAuthToken), createPayoutProvider());
 console.log(JSON.stringify(report, null, 2));
 if (report.errors.length || report.needsReview.length) process.exitCode = 1;

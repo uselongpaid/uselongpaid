@@ -1,0 +1,11 @@
+# Netlify: Next.js (built with Netlify's Next.js runtime) + a scheduled function for the long.xyz scan and payouts.
+# Set DATABASE_URL / DATABASE_AUTH_TOKEN (Turso) and the app's other variables in Site settings → Environment.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"

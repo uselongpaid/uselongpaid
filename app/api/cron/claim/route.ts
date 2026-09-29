@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   if (running) return NextResponse.json({ error: "a claim cycle is already running" }, { status: 409 });
   running = true;
   try {
-    const report = await runClaimCycle(db(), feeSource(), payoutProvider(), ledgerOptions());
+    const report = await runClaimCycle(await db(), feeSource(), payoutProvider(), ledgerOptions());
     return NextResponse.json(report);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
