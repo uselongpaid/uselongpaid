@@ -37,10 +37,10 @@ claim with its transaction hash. From that moment on, everything is automatic:
 
 ## The LongPaid coin
 
-CA **`0x0a800872db268498e94fd80fdaea318552d31e18`** (Robinhood Chain). The home page and [`/ca`](https://uselongpaid.xyz/ca) show its price,
-24h change, market cap, volume, liquidity and trades, refreshed every 10 seconds, with a live chart. Data comes from
-DEX Screener, then GeckoTerminal ([`lib/marketData.ts`](lib/marketData.ts)); name and symbol fall back to the token
-contract. Set `PROJECT_COIN_ADDRESS` to change it.
+Set `PROJECT_COIN_ADDRESS` to the coin's contract address and the home page and [`/ca`](https://uselongpaid.xyz/ca) show
+its CA, price, 24h change, market cap, volume, liquidity and trades, refreshed every 10 seconds, with a live chart. Data
+comes from DEX Screener, then GeckoTerminal ([`lib/marketData.ts`](lib/marketData.ts)); name and symbol fall back to the
+token contract. While it's empty, `/ca` says the CA is coming soon.
 
 ## Contents
 

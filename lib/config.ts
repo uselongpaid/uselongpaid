@@ -36,7 +36,7 @@ export const config = {
   sessionSecret: process.env.SESSION_SECRET || "",
   /** LongPaid's own coin: live chart and stats on the home page and /coin/:address, CA in the footer. Empty hides it. */
   projectCoin: {
-    address: (process.env.PROJECT_COIN_ADDRESS ?? "0x0a800872db268498e94fd80fdaea318552d31e18").trim().toLowerCase(),
+    address: (process.env.PROJECT_COIN_ADDRESS ?? "").trim().toLowerCase(),
     /** Shown until the market data returns the real ticker. */
     symbol: (process.env.PROJECT_COIN_SYMBOL || "").replace(/^\$/, ""),
     buyUrl: process.env.PROJECT_COIN_BUY_URL || "https://app.long.xyz",
