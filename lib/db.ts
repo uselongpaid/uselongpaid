@@ -2,7 +2,7 @@
 // runs on serverless hosts like Netlify; locally and in tests a SQLite file (file:…). The small async wrapper below
 // keeps the familiar prepare(sql).get/all/run shape.
 
-import { createClient, type Client, type InArgs, type ResultSet, type Transaction } from "@libsql/client";
+import type { Client, Config, InArgs, ResultSet, Transaction } from "@libsql/client";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { tmpdir } from "node:os";
@@ -169,12 +169,24 @@ function wrap(ex: Executor, client: Client): Db {
  * ":memory:" (a fresh temporary file, since libSQL transactions need a real file).
  */
 export async function openDb(url: string, authToken?: string): Promise<Db> {
-  let u = url;
+  let u = url.trim();
+  const remote = /^(libsql|https?|wss?):\/\//i.test(u);
+  if (!remote && (process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME)) {
+    throw new Error(
+      "DATABASE_URL isn't set to a hosted database. On Netlify set DATABASE_URL (libsql://…turso.io) and DATABASE_AUTH_TOKEN " +
+        "in Site configuration → Environment variables, then redeploy.",
+    );
+  }
   if (u === ":memory:") u = `file:${join(tmpdir(), `longpaid-${randomUUID()}.db`)}`;
-  else if (!/^[a-z]+:/i.test(u)) {
+  else if (!remote && !/^file:/i.test(u)) {
     mkdirSync(dirname(u), { recursive: true });
     u = `file:${u}`;
   }
+  // A hosted database only needs HTTP: the web client has no native module, so it bundles cleanly into serverless
+  // functions. The node client (which loads the native libsql module) is only used for local files.
+  const { createClient } = (remote ? await import("@libsql/client/web") : await import("@libsql/client")) as {
+    createClient(c: Config): Client;
+  };
   const client = createClient({ url: u, authToken: authToken || undefined });
   const db = wrap(client, client);
   if (u.startsWith("file:")) await db.exec("PRAGMA journal_mode = WAL;").catch(() => {});

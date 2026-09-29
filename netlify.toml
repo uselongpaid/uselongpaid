@@ -9,3 +9,7 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Netlify's Next.js runtime (turns the app into functions + edge routing). Pinned here so it's always used.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
