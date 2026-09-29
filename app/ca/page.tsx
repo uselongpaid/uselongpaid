@@ -7,7 +7,7 @@ import { ExternalCoin } from "@/components/ExternalCoin.tsx";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const a = config.projectCoin.address;
+  const a = "";
   const m = a ? await marketWithin(a, 2000) : null;
   const sym = m?.symbol ?? config.projectCoin.symbol;
   return {
@@ -19,7 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** uselongpaid.xyz/ca: the official coin's CA, live numbers and chart. */
 export default async function Ca() {
-  const a = config.projectCoin.address;
+  // Coin section is off until the relaunch: always show "coming soon", whatever PROJECT_COIN_ADDRESS says.
+  const a = "";
   if (!a) {
     return (
       <div className="docs" style={{ textAlign: "center", padding: "80px 0" }}>
