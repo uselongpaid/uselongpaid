@@ -34,13 +34,6 @@ export const config = {
   payoutWebhookSecret: process.env.PAYOUT_WEBHOOK_SECRET || "",
   appUrl: (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, ""),
   sessionSecret: process.env.SESSION_SECRET || "",
-  /** LongPaid's own coin: live chart and stats on the home page and /coin/:address, CA in the footer. Empty hides it. */
-  projectCoin: {
-    address: (process.env.PROJECT_COIN_ADDRESS ?? "").trim().toLowerCase(),
-    /** Shown until the market data returns the real ticker. */
-    symbol: (process.env.PROJECT_COIN_SYMBOL || "").replace(/^\$/, ""),
-    buyUrl: process.env.PROJECT_COIN_BUY_URL || "https://app.long.xyz",
-  },
   /** Detecting launches on app.long.xyz that send their fees to LongPaid. */
   detect: {
     factory: process.env.LONG_FACTORY_ADDRESS || "0x1Eef016F22A943abC7DD11422EDeE9D235942104",
