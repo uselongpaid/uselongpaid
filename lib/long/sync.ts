@@ -2,7 +2,7 @@ import type { Hex } from "viem";
 import { type Db, getKv, setKv } from "../db.ts";
 import { upsertToken } from "../ledger.ts";
 import { feeHandleFromMetadata, type TokenMetadata } from "../handle.ts";
-import { metadataUrls, poolDataFromLaunchInput, poolDataIncludes, type LaunchedToken } from "./factory.ts";
+import { metadataUrls, type LaunchedToken, feeWalletInLaunch } from "./factory.ts";
 
 function imageUrl(meta: TokenMetadata): string | null {
   const raw = typeof meta.image === "string" && meta.image ? meta.image : typeof meta.image_hash === "string" ? meta.image_hash : "";
@@ -113,7 +113,7 @@ export async function syncLaunches(db: Db, reader: LaunchReader, fetchMeta: Meta
 async function recordIfOurs(db: Db, reader: LaunchReader, l: LaunchedToken, opts: SyncOptions): Promise<boolean> {
   const asset = l.asset.toLowerCase();
   if (db.prepare("SELECT 1 FROM detected_launches WHERE asset = ?").get(asset)) return true;
-  const wallet = poolDataIncludes(poolDataFromLaunchInput(await reader.launchInput(l.txHash)), opts.feeWallets);
+  const wallet = feeWalletInLaunch(await reader.launchInput(l.txHash), opts.feeWallets);
   if (!wallet) return false;
   const now = Date.now();
   db.prepare(

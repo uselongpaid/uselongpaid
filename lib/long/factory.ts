@@ -104,6 +104,26 @@ export function poolDataFromLaunchInput(input: Hex): Hex {
 }
 
 /**
+ * Which LongPaid fee wallet a launch transaction routes fees to, if any. Decodes launch(CreateParams, …) when the
+ * call matches the known ABI; any other entry point long.xyz uses (a newer launch function, a router, a multicall)
+ * is checked by looking for the wallet ABI-encoded (left-padded to 32 bytes) anywhere in the calldata.
+ */
+export function feeWalletInLaunch(input: Hex, wallets: string[]): string | null {
+  try {
+    return poolDataIncludes(poolDataFromLaunchInput(input), wallets);
+  } catch {
+    const hex = input.toLowerCase().replace(/^0x/, "");
+    for (const w of wallets) {
+      const padded = "0".repeat(24) + w.toLowerCase().replace(/^0x/, "");
+      for (let i = hex.indexOf(padded); i !== -1; i = hex.indexOf(padded, i + 1)) {
+        if (i % 2 === 0) return w;
+      }
+    }
+    return null;
+  }
+}
+
+/**
  * True when one of `wallets` is written in the pool data as a full 32-byte word. That's how the fee
  * beneficiaries are encoded; a bare substring match could hit unrelated bytes, a word match can't.
  */

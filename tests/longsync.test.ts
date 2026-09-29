@@ -163,3 +163,14 @@ test("metadata URLs try several IPFS gateways for any IPFS form", async () => {
   assert.equal(metadataUrls(`https://example.mypinata.cloud/ipfs/${cid}`)[0], `https://example.mypinata.cloud/ipfs/${cid}`);
   assert.deepEqual(metadataUrls("https://api.example.com/meta/1.json"), ["https://api.example.com/meta/1.json"]);
 });
+
+test("launches through other long.xyz entry points are still recognised", async () => {
+  const { feeWalletInLaunch } = await import("../lib/long/factory.ts");
+  const ours = "0x13A05697e39F0a2b3638154a1cF85e59d85A05d3";
+  const word = (hex: string) => hex.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+  // Unknown selector 0xb0da329a, wallet nested at a 4-byte offset (like calldata inside a router call).
+  const input = `0xb0da329a${word("0x40")}${"00".repeat(4)}${word(ours)}${word("0x1234")}` as `0x${string}`;
+  assert.equal(feeWalletInLaunch(input, [ours]), ours);
+  const other = `0xb0da329a${word("0x40")}${word("0x9999999999999999999999999999999999999999")}` as `0x${string}`;
+  assert.equal(feeWalletInLaunch(other, [ours]), null);
+});
